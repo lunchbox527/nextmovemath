@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { Share2, Printer, Check, BookOpen, Calculator as CalcIcon, ShieldCheck, Mail, Info } from "lucide-react";
 import AdBanner from "./AdBanner";
+import { PartnerOfferCard } from "./PartnerOfferCard";
 import { ComplianceModal, CompliancePageType } from "./ComplianceModal";
 import { EducationalGuides } from "./EducationalGuides";
 import { MethodologyView } from "./MethodologyView";
@@ -710,27 +711,10 @@ export default function NextMoveMathCalculator({
             </div>
           </section>
 
-          {/* Top Banner Ad: Strategically placed between Quiet Costs and Path Picker */}
-          {showHeroAd && (
-            <div className={`homeward-ad-slot top-prime-ad ${inspectOutlines ? "inspected" : ""}`} style={{ margin: "24px auto 32px", maxWidth: "980px" }}>
-              {inspectOutlines && (
-                <div className="homeward-ad-label">
-                  <span>📍 Ad Placement #1: Prime Pause Unit</span>
-                  <span>High dwell view between Quiet Costs and Path Picker</span>
-                </div>
-              )}
-              <AdBanner
-                dataAdSlot="8392019482"
-                dataAdClient={publisherId}
-                dataAdFormat="auto"
-                dataFullWidthResponsive={true}
-                simulation={simulationMode}
-                minHeight={120}
-                creativeIndex={0}
-                style={{ width: "100%", borderRadius: "14px", overflow: "hidden" }}
-              />
-            </div>
-          )}
+          {/* Live Mortgage Rate Comparison Partner Bar */}
+          <div style={{ margin: "24px auto 32px", maxWidth: "1060px" }}>
+            <PartnerOfferCard variant="live-rates" isUS={isUS} mode={mode} />
+          </div>
 
           <div className="path-picker" aria-label="Choose your situation">
             <p>First things first—what are you planning?</p>
@@ -1389,30 +1373,14 @@ export default function NextMoveMathCalculator({
 
           {/* Sticky Results Sidebar Column */}
           <div className="results-sidebar-column">
-            {/* Separate Medium Sticky Top Ad (~95px - double previous slim size) */}
-            {showSidebarAd && (
-              <div className={`sticky-top-ad-card ${inspectOutlines ? "inspected" : ""}`}>
-                {inspectOutlines && (
-                  <div className="sidebar-ad-label">
-                    <span>📍 Sticky Top Ad: 100% Active View Viewability</span>
-                    <span>Directly above results card: ~150px high-yield display sponsor card</span>
-                  </div>
-                )}
-                <div className="sticky-ad-box">
-                  <AdBanner
-                    dataAdSlot="3029184719"
-                    dataAdClient={publisherId}
-                    dataAdFormat="auto"
-                    dataFullWidthResponsive={true}
-                    simulation={simulationMode}
-                    size="large"
-                    minHeight={148}
-                    creativeIndex={2}
-                    style={{ width: "100%", borderRadius: "10px", overflow: "hidden" }}
-                  />
-                </div>
-              </div>
-            )}
+            {/* Sticky Pre-Approval & Rate Lock Partner Card */}
+            <PartnerOfferCard
+              variant="sticky-sidebar"
+              isUS={isUS}
+              mode={mode}
+              purchasePrice={purchasePrice}
+              monthlyPayment={figures.selectedPayment}
+            />
 
             <aside
               className={`results-panel ${mode === "rent" ? "rental-results-panel" : ""}`}
@@ -1698,32 +1666,14 @@ export default function NextMoveMathCalculator({
               ))}
             </div>
 
-            {/* Editorial Side Ad Placement */}
-            {showBottomAd && (
-              <aside className="faq-sidebar-column">
-                <div className={`faq-sidebar-ad-card ${inspectOutlines ? "inspected" : ""}`}>
-                  {inspectOutlines && (
-                    <div className="homeward-ad-label">
-                      <span>📍 Scenario Partner Ad</span>
-                      <span>High viewability beside active questions</span>
-                    </div>
-                  )}
-                  <div className="faq-ad-box">
-                    <span className="faq-sponsor-tag">Partner Rates & Resources</span>
-                    <AdBanner
-                      dataAdSlot="4920194821"
-                      dataAdClient={publisherId}
-                      dataAdFormat="auto"
-                      dataFullWidthResponsive={true}
-                      simulation={simulationMode}
-                      minHeight={250}
-                      creativeIndex={1}
-                      style={{ width: "100%", borderRadius: "12px", overflow: "hidden" }}
-                    />
-                  </div>
-                </div>
-              </aside>
-            )}
+            {/* Direct Specialist & Advisory Partner Card */}
+            <aside className="faq-sidebar-column">
+              <PartnerOfferCard
+                variant="consultation"
+                isUS={isUS}
+                mode={mode}
+              />
+            </aside>
           </div>
         </section>
         </>
