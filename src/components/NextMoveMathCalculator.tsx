@@ -1751,27 +1751,21 @@ export default function NextMoveMathCalculator({
               >
                 Terms of Service
               </button>
-              <span className="dot">·</span>
-              <a
-                href="https://adssettings.google.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="footer-link"
-                style={{ color: "#60746d" }}
-                title="Google Ad Personalization Settings"
-              >
-                Ad Choices ↗
-              </a>
-              <span className="dot">·</span>
-              <a
-                href="/nextmovemath-source.zip"
-                download="nextmovemath-source.zip"
-                className="footer-link"
-                style={{ color: "#2e7450", fontWeight: 700 }}
-                title="Download complete production package (Vercel & Namecheap ready)"
-              >
-                📦 Download Code (Vercel Ready)
-              </a>
+              {/* Developer Download Helper: Visible in AI Studio Dev Preview, but automatically hidden on live nextmovemath.com */}
+              {typeof window !== 'undefined' && !window.location.hostname.includes('nextmovemath.com') && (
+                <>
+                  <span className="dot">·</span>
+                  <a
+                    href="/nextmovemath-source.zip"
+                    download="nextmovemath-source.zip"
+                    className="footer-link"
+                    style={{ color: "#2e7450", fontWeight: 700 }}
+                    title="Download complete production package (Vercel & Namecheap ready)"
+                  >
+                    📦 Download Code (Vercel Ready)
+                  </a>
+                </>
+              )}
             </div>
           </div>
           <button
