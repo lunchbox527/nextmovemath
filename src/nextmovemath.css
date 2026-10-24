@@ -28,7 +28,7 @@
 .homeward-app .brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px 10px 10px 3px; background: var(--ink); color: var(--cream); font-family: Georgia, 'Times New Roman', serif; font-weight: 700; font-size: 19px; }
 
 .homeward-app .topbar-nav { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-.homeward-app .topbar-nav .nav-link { background: transparent; border: 0; padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #556862; cursor: pointer; transition: all 0.2s ease; font-family: Arial, Helvetica, sans-serif; }
+.homeward-app .topbar-nav .nav-link { background: transparent; border: 0; padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #556862; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; transition: all 0.2s ease; font-family: Arial, Helvetica, sans-serif; }
 .homeward-app .topbar-nav .nav-link:hover { color: var(--ink); background: rgba(23,49,45,0.06); }
 .homeward-app .topbar-nav .nav-link.active { color: var(--ink); font-weight: 800; background: #e8e3d8; box-shadow: inset 0 1px 2px rgba(23,49,45,0.08); }
 .homeward-app .country-switch-pill { display: flex; background: #e8e3d8; padding: 3px; border-radius: 999px; border: 1px solid var(--line); gap: 2px; }
@@ -37,7 +37,7 @@
 .homeward-app .country-btn.active { background: #17312d; color: #fffdf8; box-shadow: 0 2px 8px rgba(23,49,45,.15); }
 
 .homeward-app .topbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-.homeward-app .topbar-actions .action-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 12px; background: white; color: #17312d; font-size: 12.5px; font-weight: 700; cursor: pointer; transition: all 0.2s ease; }
+.homeward-app .topbar-actions .action-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 12px; background: white; color: #17312d; font-size: 12.5px; font-weight: 700; cursor: pointer; text-decoration: none; transition: all 0.2s ease; }
 .homeward-app .topbar-actions .action-btn:hover { background: #f4efe5; border-color: #17312d; }
 .homeward-app .topbar-actions .action-btn.print-btn { background: #2e7450; color: white; border-color: #2e7450; }
 .homeward-app .topbar-actions .action-btn.print-btn:hover { background: #245d40; }
@@ -812,8 +812,10 @@
 }
 
 @media (max-width: 720px) {
-  .homeward-app .topbar { grid-template-columns: 1fr auto; }
-  .homeward-app .nav-link, .homeward-app .location-pill { display: none; }
+  .homeward-app .topbar { gap: 10px; }
+  .homeward-app .topbar-nav { width: 100%; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 2px; }
+  .homeward-app .topbar-nav .nav-link { white-space: nowrap; font-size: 12px; padding: 5px 10px; }
+  .homeward-app .location-pill { display: none; }
   .homeward-app .hero { padding: 44px 0 32px; }
   .homeward-app .hero-copy { font-size: 15px; }
   .homeward-app .path-picker { margin-top: 32px; }

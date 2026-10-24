@@ -1,14 +1,13 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { Share2, Printer, Check, BookOpen, Calculator as CalcIcon, ShieldCheck, Mail, Info } from "lucide-react";
-import AdBanner from "./AdBanner";
-import { PartnerOfferCard } from "./PartnerOfferCard";
-import { ComplianceModal, CompliancePageType } from "./ComplianceModal";
+import { Share2, Printer, Check, BookOpen, Calculator as CalcIcon, ArrowRight, Clock } from "lucide-react";
 import { EducationalGuides } from "./EducationalGuides";
 import { MethodologyView } from "./MethodologyView";
 import { AboutView } from "./AboutView";
 import { ContactView } from "./ContactView";
+import { LegalPageView } from "./LegalPageView";
+import { GUIDE_ARTICLES } from "../data/siteContent.js";
 import "../nextmovemath.css";
 
 export type ActiveTab = "calculator" | "guides" | "methodology" | "about" | "contact";
@@ -19,17 +18,13 @@ export interface NextMoveMathCalculatorProps {
   publisherId: string;
   simulationMode: boolean;
   inspectOutlines: boolean;
-  showHeroAd?: boolean;
-  showMidAd?: boolean;
-  showSidebarAd?: boolean;
-  showBottomAd?: boolean;
   country?: "CA" | "US";
   setCountry?: (country: "CA" | "US") => void;
   onShare?: () => void;
   onPrint?: () => void;
   shareToast?: boolean;
-  activeTab?: ActiveTab;
-  setActiveTab?: (tab: ActiveTab) => void;
+  currentPath?: string;
+  onNavigate?: (path: string, e?: React.MouseEvent) => void;
 }
 
 const paths: { id: Mode; label: string; detail: string }[] = [
@@ -257,31 +252,27 @@ function SelectField({
 }
 
 export default function NextMoveMathCalculator({
-  publisherId,
-  simulationMode,
-  inspectOutlines,
-  showHeroAd = true,
-  showMidAd = false,
-  showSidebarAd = true,
-  showBottomAd = true,
   country = "CA",
   setCountry,
   onShare,
   onPrint,
   shareToast,
-  activeTab,
-  setActiveTab,
+  currentPath = "/",
+  onNavigate,
 }: NextMoveMathCalculatorProps) {
   const currentCountry = country || "CA";
   const isUS = currentCountry === "US";
-  const [internalTab, setInternalTab] = useState<ActiveTab>("calculator");
-  const currentTab = activeTab || internalTab;
+  const [internalPath, setInternalPath] = useState<string>("/");
+  const activePath = currentPath || internalPath;
 
-  const handleTabChange = (t: ActiveTab, e?: React.MouseEvent) => {
-    if (e) e.preventDefault();
-    if (setActiveTab) setActiveTab(t);
-    else setInternalTab(t);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  const navigate = (path: string, e?: React.MouseEvent) => {
+    if (onNavigate) {
+      onNavigate(path, e);
+    } else {
+      if (e) e.preventDefault();
+      setInternalPath(path);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
 
   const money = useMemo(() => {
@@ -292,17 +283,31 @@ export default function NextMoveMathCalculator({
     });
   }, [isUS]);
 
-  const [complianceModalOpen, setComplianceModalOpen] = useState(false);
-  const [compliancePage, setCompliancePage] = useState<CompliancePageType>("privacy");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [mode, setMode] = useState<Mode>("move");
 
-  const handleOpenCompliance = (p: CompliancePageType, e?: React.MouseEvent) => {
-    if (e) e.preventDefault();
-    setCompliancePage(p);
-    setComplianceModalOpen(true);
+  const handleOpenCalculatorMode = (targetMode: Mode, e?: React.MouseEvent) => {
+    setMode(targetMode);
+    navigate("/", e);
   };
 
-  const [mode, setMode] = useState<Mode>("move");
+  const isHomeRoute = activePath === "/";
+  const isGuidesRoute = activePath === "/guides" || activePath.startsWith("/guides/");
+  const guideSlug = activePath.startsWith("/guides/") ? activePath.slice("/guides/".length) : undefined;
+  const isMethodologyRoute = activePath === "/methodology";
+  const isAboutRoute = activePath === "/about";
+  const isContactRoute = activePath === "/contact";
+  const isPrivacyRoute = activePath === "/privacy-policy";
+  const isTermsRoute = activePath === "/terms-of-service";
+  // Fallback unknown paths cleanly to home calculator
+  const showCalculator =
+    isHomeRoute ||
+    (!isGuidesRoute &&
+      !isMethodologyRoute &&
+      !isAboutRoute &&
+      !isContactRoute &&
+      !isPrivacyRoute &&
+      !isTermsRoute);
   const [financing, setFinancing] = useState<Financing>("mortgage");
   const [salePrice, setSalePrice] = useState(900_000);
   const [mortgageOwing, setMortgageOwing] = useState(510_000);
@@ -511,13 +516,13 @@ export default function NextMoveMathCalculator({
   return (
     <div className="nextmovemath-app homeward-app">
       <main>
-        {/* Single Unified Header / Topbar */}
+        {/* Single Unified Header / Topbar with Crawlable Anchor Links */}
         <nav className="topbar">
           <div className="topbar-left">
-            <a 
-              className="brand" 
-              href="#top" 
-              onClick={(e) => handleTabChange("calculator", e)}
+            <a
+              className="brand"
+              href="/"
+              onClick={(e) => navigate("/", e)}
               aria-label="NextMoveMath home"
             >
               <span className="brand-mark">N</span>
@@ -525,41 +530,41 @@ export default function NextMoveMathCalculator({
             </a>
 
             <div className="topbar-nav" role="navigation" aria-label="Main navigation">
-              <button
-                type="button"
-                onClick={(e) => handleTabChange("calculator", e)}
-                className={`nav-link ${currentTab === "calculator" ? "active" : ""}`}
+              <a
+                href="/"
+                onClick={(e) => navigate("/", e)}
+                className={`nav-link ${showCalculator ? "active" : ""}`}
               >
                 Calculator
-              </button>
-              <button
-                type="button"
-                onClick={(e) => handleTabChange("guides", e)}
-                className={`nav-link ${currentTab === "guides" ? "active" : ""}`}
+              </a>
+              <a
+                href="/guides"
+                onClick={(e) => navigate("/guides", e)}
+                className={`nav-link ${isGuidesRoute ? "active" : ""}`}
               >
                 Guides & Library
-              </button>
-              <button
-                type="button"
-                onClick={(e) => handleTabChange("methodology", e)}
-                className={`nav-link ${currentTab === "methodology" ? "active" : ""}`}
+              </a>
+              <a
+                href="/methodology"
+                onClick={(e) => navigate("/methodology", e)}
+                className={`nav-link ${isMethodologyRoute ? "active" : ""}`}
               >
                 Methodology
-              </button>
-              <button
-                type="button"
-                onClick={(e) => handleTabChange("about", e)}
-                className={`nav-link ${currentTab === "about" ? "active" : ""}`}
+              </a>
+              <a
+                href="/about"
+                onClick={(e) => navigate("/about", e)}
+                className={`nav-link ${isAboutRoute ? "active" : ""}`}
               >
                 About
-              </button>
-              <button
-                type="button"
-                onClick={(e) => handleTabChange("contact", e)}
-                className={`nav-link ${currentTab === "contact" ? "active" : ""}`}
+              </a>
+              <a
+                href="/contact"
+                onClick={(e) => navigate("/contact", e)}
+                className={`nav-link ${isContactRoute ? "active" : ""}`}
               >
                 Contact
-              </button>
+              </a>
             </div>
           </div>
 
@@ -589,7 +594,7 @@ export default function NextMoveMathCalculator({
 
           {/* Right Action Buttons */}
           <div className="topbar-actions">
-            {currentTab === "calculator" ? (
+            {showCalculator ? (
               <>
                 <button
                   type="button"
@@ -611,40 +616,40 @@ export default function NextMoveMathCalculator({
                 </button>
               </>
             ) : (
-              <button
-                type="button"
-                onClick={(e) => handleTabChange("calculator", e)}
+              <a
+                href="/"
+                onClick={(e) => navigate("/", e)}
                 className="action-btn print-btn cursor-pointer"
                 title="Open interactive calculator"
               >
                 <CalcIcon className="w-3.5 h-3.5" />
                 <span>Open Calculator</span>
-              </button>
+              </a>
             )}
           </div>
         </nav>
 
-        {/* View Routing */}
-        {currentTab === "guides" && (
-          <EducationalGuides onGoToCalculator={() => handleTabChange("calculator")} isUS={isUS} />
-        )}
-
-        {currentTab === "methodology" && (
-          <MethodologyView onGoToCalculator={() => handleTabChange("calculator")} />
-        )}
-
-        {currentTab === "about" && (
-          <AboutView 
-            onGoToCalculator={() => handleTabChange("calculator")}
-            onGoToContact={() => handleTabChange("contact")}
+        {/* Multi-Page Route Views */}
+        {isGuidesRoute && (
+          <EducationalGuides
+            slug={guideSlug}
+            onNavigate={navigate}
+            onOpenCalculatorMode={handleOpenCalculatorMode}
+            isUS={isUS}
           />
         )}
 
-        {currentTab === "contact" && (
-          <ContactView onGoToCalculator={() => handleTabChange("calculator")} />
-        )}
+        {isMethodologyRoute && <MethodologyView onNavigate={navigate} />}
 
-        {currentTab === "calculator" && (
+        {isAboutRoute && <AboutView onNavigate={navigate} />}
+
+        {isContactRoute && <ContactView onNavigate={navigate} />}
+
+        {isPrivacyRoute && <LegalPageView page="privacy" onNavigate={navigate} />}
+
+        {isTermsRoute && <LegalPageView page="terms" onNavigate={navigate} />}
+
+        {showCalculator && (
           <>
             {/* Hero Section */}
             <section className="hero" id="top">
@@ -710,11 +715,6 @@ export default function NextMoveMathCalculator({
               </article>
             </div>
           </section>
-
-          {/* Live Mortgage Rate Comparison Partner Bar */}
-          <div style={{ margin: "24px auto 32px", maxWidth: "1060px" }}>
-            <PartnerOfferCard variant="live-rates" isUS={isUS} mode={mode} />
-          </div>
 
           <div className="path-picker" aria-label="Choose your situation">
             <p>First things first—what are you planning?</p>
@@ -1373,15 +1373,6 @@ export default function NextMoveMathCalculator({
 
           {/* Sticky Results Sidebar Column */}
           <div className="results-sidebar-column">
-            {/* Sticky Pre-Approval & Rate Lock Partner Card */}
-            <PartnerOfferCard
-              variant="sticky-sidebar"
-              isUS={isUS}
-              mode={mode}
-              purchasePrice={purchasePrice}
-              monthlyPayment={figures.selectedPayment}
-            />
-
             <aside
               className={`results-panel ${mode === "rent" ? "rental-results-panel" : ""}`}
               aria-live="polite"
@@ -1666,25 +1657,123 @@ export default function NextMoveMathCalculator({
               ))}
             </div>
 
-            {/* Direct Specialist & Advisory Partner Card */}
+            {/* Editorial Deep-Dive Sidebar Links */}
             <aside className="faq-sidebar-column">
-              <PartnerOfferCard
-                variant="consultation"
-                isUS={isUS}
-                mode={mode}
-              />
+              <div className="bg-white border border-[rgba(23,49,45,0.14)] rounded-2xl p-6 shadow-sm">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#e7f2e9] text-[#2e7450] text-[11px] font-bold uppercase tracking-wider mb-3">
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>Editorial Library</span>
+                </div>
+                <h3 className="text-xl font-serif font-bold text-[#17312d] m-0 mb-2">
+                  Read the Worked Moving Math Guides
+                </h3>
+                <p className="text-xs text-[#556862] leading-relaxed mb-4">
+                  Explore step-by-step formulas, statutory compounding rules, and line-by-line closing cost tables.
+                </p>
+                <div className="space-y-2.5 mb-5">
+                  {GUIDE_ARTICLES.slice(0, 4).map((guide) => (
+                    <a
+                      key={guide.slug}
+                      href={`/guides/${guide.slug}`}
+                      onClick={(e) => navigate(`/guides/${guide.slug}`, e)}
+                      className="block p-3 rounded-xl bg-[#fffdf8] border border-[rgba(23,49,45,0.1)] hover:border-[#2e7450] transition-colors no-underline group"
+                    >
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-[#ec715a] mb-0.5">
+                        {guide.badge} · {guide.readTime}
+                      </span>
+                      <span className="block text-xs font-bold text-[#17312d] group-hover:text-[#2e7450] leading-snug">
+                        {guide.title}
+                      </span>
+                    </a>
+                  ))}
+                </div>
+                <a
+                  href="/guides"
+                  onClick={(e) => navigate("/guides", e)}
+                  className="inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl bg-[#17312d] hover:bg-[#234741] text-white text-xs font-bold transition-colors no-underline"
+                >
+                  <span>Browse All {GUIDE_ARTICLES.length} Math Guides</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </a>
+              </div>
             </aside>
+          </div>
+        </section>
+
+        {/* Featured Editorial Guides Hub Section on Homepage */}
+        <section className="max-w-[1080px] w-[calc(100%-40px)] mx-auto mb-20">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+            <div>
+              <span className="eyebrow block mb-2">IN-DEPTH MOVING & MORTGAGE LIBRARY</span>
+              <h2 className="text-2xl sm:text-4xl font-serif font-medium text-[#17312d] m-0 tracking-tight">
+                Plain-English guides behind every formula.
+              </h2>
+            </div>
+            <a
+              href="/guides"
+              onClick={(e) => navigate("/guides", e)}
+              className="inline-flex items-center gap-1.5 text-sm font-bold text-[#2e7450] hover:text-[#17312d] no-underline shrink-0"
+            >
+              <span>View all {GUIDE_ARTICLES.length} guides</span>
+              <ArrowRight className="w-4 h-4" />
+            </a>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {GUIDE_ARTICLES.slice(0, 6).map((article) => (
+              <article
+                key={article.slug}
+                className="bg-[#fffdf8] border border-[rgba(23,49,45,0.14)] rounded-2xl p-6 flex flex-col justify-between hover:border-[#2e7450] transition-all shadow-sm"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 text-[11px] text-[#60746d] mb-3">
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#e7f2e9] text-[#2e7450] font-bold uppercase tracking-wider">
+                      {article.badge}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {article.readTime}
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-serif font-bold text-[#17312d] leading-snug m-0 mb-2.5">
+                    <a
+                      href={`/guides/${article.slug}`}
+                      onClick={(e) => navigate(`/guides/${article.slug}`, e)}
+                      className="text-inherit hover:text-[#2e7450] no-underline"
+                    >
+                      {article.title}
+                    </a>
+                  </h3>
+                  <p className="text-xs text-[#556862] leading-relaxed line-clamp-3 m-0 mb-4">
+                    {article.summary}
+                  </p>
+                </div>
+                <a
+                  href={`/guides/${article.slug}`}
+                  onClick={(e) => navigate(`/guides/${article.slug}`, e)}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#2e7450] hover:text-[#17312d] no-underline pt-3 border-t border-[rgba(23,49,45,0.08)]"
+                >
+                  <span>Read full guide</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </a>
+              </article>
+            ))}
           </div>
         </section>
         </>
         )}
 
-        {/* Footer */}
+        {/* Footer with Crawlable Anchor Links */}
         <footer>
-          <div className="brand">
+          <a
+            href="/"
+            onClick={(e) => navigate("/", e)}
+            className="brand"
+            aria-label="NextMoveMath home"
+          >
             <span className="brand-mark">N</span>
             <span>NextMoveMath</span>
-          </div>
+          </a>
           <div className="footer-center">
             <p>
               Helpful estimates for planning—not a lending decision or financial advice. Local taxes
@@ -1692,67 +1781,66 @@ export default function NextMoveMathCalculator({
               eligibility. Adjust any amount to match your situation and confirm final costs with your
               lawyer or notary, lender, and local authority.
             </p>
-            {/* Dedicated AdSense Compliance & Navigation Links */}
             <div className="footer-links">
-              <button
-                type="button"
-                onClick={(e) => handleTabChange("calculator", e)}
-                className={`footer-link cursor-pointer ${currentTab === "calculator" ? "highlight font-bold" : ""}`}
+              <a
+                href="/"
+                onClick={(e) => navigate("/", e)}
+                className={`footer-link ${showCalculator ? "highlight font-bold" : ""}`}
               >
                 Calculator
-              </button>
+              </a>
               <span className="dot">·</span>
-              <button
-                type="button"
-                onClick={(e) => handleTabChange("guides", e)}
-                className={`footer-link cursor-pointer ${currentTab === "guides" ? "highlight font-bold" : ""}`}
+              <a
+                href="/guides"
+                onClick={(e) => navigate("/guides", e)}
+                className={`footer-link ${isGuidesRoute ? "highlight font-bold" : ""}`}
               >
                 Educational Guides
-              </button>
+              </a>
               <span className="dot">·</span>
-              <button
-                type="button"
-                onClick={(e) => handleTabChange("methodology", e)}
-                className={`footer-link cursor-pointer ${currentTab === "methodology" ? "highlight font-bold" : ""}`}
+              <a
+                href="/methodology"
+                onClick={(e) => navigate("/methodology", e)}
+                className={`footer-link ${isMethodologyRoute ? "highlight font-bold" : ""}`}
               >
                 Methodology
-              </button>
+              </a>
               <span className="dot">·</span>
-              <button
-                type="button"
-                onClick={(e) => handleTabChange("about", e)}
-                className={`footer-link cursor-pointer ${currentTab === "about" ? "highlight font-bold" : ""}`}
+              <a
+                href="/about"
+                onClick={(e) => navigate("/about", e)}
+                className={`footer-link ${isAboutRoute ? "highlight font-bold" : ""}`}
               >
                 About Us
-              </button>
+              </a>
               <span className="dot">·</span>
-              <button
-                type="button"
-                onClick={(e) => handleTabChange("contact", e)}
-                className={`footer-link cursor-pointer ${currentTab === "contact" ? "highlight font-bold" : ""}`}
+              <a
+                href="/contact"
+                onClick={(e) => navigate("/contact", e)}
+                className={`footer-link ${isContactRoute ? "highlight font-bold" : ""}`}
               >
                 Contact
-              </button>
+              </a>
               <span className="dot">·</span>
-              <button
-                type="button"
-                onClick={(e) => handleOpenCompliance("privacy", e)}
-                className="footer-link highlight cursor-pointer"
-                title="View Google AdSense compliant Privacy Policy"
+              <a
+                href="/privacy-policy"
+                onClick={(e) => navigate("/privacy-policy", e)}
+                className={`footer-link ${isPrivacyRoute ? "highlight font-bold" : "highlight"}`}
+                title="View Privacy Policy and Cookie Notice"
               >
-                Privacy Policy (Cookie Notice)
-              </button>
+                Privacy Policy
+              </a>
               <span className="dot">·</span>
-              <button
-                type="button"
-                onClick={(e) => handleOpenCompliance("terms", e)}
-                className="footer-link cursor-pointer"
+              <a
+                href="/terms-of-service"
+                onClick={(e) => navigate("/terms-of-service", e)}
+                className={`footer-link ${isTermsRoute ? "highlight font-bold" : ""}`}
                 title="View Terms of Service"
               >
                 Terms of Service
-              </button>
-              {/* Developer Download Helper: Visible in AI Studio Dev Preview, but automatically hidden on live nextmovemath.com */}
-              {typeof window !== 'undefined' && !window.location.hostname.includes('nextmovemath.com') && (
+              </a>
+              {/* Developer Download Helper: Visible in AI Studio Dev Preview, automatically hidden on live nextmovemath.com */}
+              {typeof window !== "undefined" && !window.location.hostname.includes("nextmovemath.com") && (
                 <>
                   <span className="dot">·</span>
                   <a
@@ -1760,7 +1848,7 @@ export default function NextMoveMathCalculator({
                     download="nextmovemath-source.zip"
                     className="footer-link"
                     style={{ color: "#2e7450", fontWeight: 700 }}
-                    title="Download complete production package (Vercel & Namecheap ready)"
+                    title="Download complete production package (Vercel & GitHub ready)"
                   >
                     📦 Download Code (Vercel Ready)
                   </a>
@@ -1871,13 +1959,6 @@ export default function NextMoveMathCalculator({
           </div>
         </section>
 
-        {/* Dedicated Compliance Pages Modal */}
-        <ComplianceModal
-          isOpen={complianceModalOpen}
-          page={compliancePage}
-          onClose={() => setComplianceModalOpen(false)}
-          onSelectPage={(p) => setCompliancePage(p)}
-        />
       </main>
     </div>
   );

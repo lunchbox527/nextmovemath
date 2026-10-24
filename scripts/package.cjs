@@ -35,6 +35,7 @@ async function createPackages() {
     /^\.git/,
     /^\.aistudio/,
     /^dist/,
+    /^bun\.lock$/,
     /nextmovemath-source\.zip/,
     /nextmovemath-dist\.zip/
   ];
@@ -44,19 +45,8 @@ async function createPackages() {
   const sourceBuffer = await sourceZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
   const sourceZipPath = path.join(publicDir, 'nextmovemath-source.zip');
   fs.writeFileSync(sourceZipPath, sourceBuffer);
-  console.log(`Source zip created at: ${sourceZipPath} (${(sourceBuffer.length / (1024 * 1024)).toFixed(2)} MB)`);
-
-  if (fs.existsSync(distDir)) {
-    console.log('Building pre-compiled dist zip...');
-    const distZip = new JSZip();
-    await addDirectoryToZip(distZip, distDir, distDir, []);
-    const distBuffer = await distZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
-    const distZipPath = path.join(publicDir, 'nextmovemath-dist.zip');
-    fs.writeFileSync(distZipPath, distBuffer);
-    console.log(`Dist zip created at: ${distZipPath} (${(distBuffer.length / (1024 * 1024)).toFixed(2)} MB)`);
-  }
-
-  console.log('All packages prepared successfully!');
+  console.log(`Source zip created at: ${sourceZipPath} (${(sourceBuffer.length / 1024).toFixed(1)} KB)`);
+  console.log('Package prepared successfully!');
 }
 
 createPackages().catch(err => {
