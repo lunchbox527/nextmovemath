@@ -37,7 +37,8 @@ async function createPackages() {
     /^dist/,
     /^bun\.lock$/,
     /nextmovemath-source\.zip/,
-    /nextmovemath-dist\.zip/
+    /nextmovemath-dist\.zip/,
+    /^public\/assets\/aistudio/
   ];
 
   await addDirectoryToZip(sourceZip, rootDir, rootDir, sourceExcludes);

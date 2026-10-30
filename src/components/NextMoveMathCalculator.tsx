@@ -1,30 +1,19 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { Share2, Printer, Check, BookOpen, Calculator as CalcIcon, ArrowRight, Clock } from "lucide-react";
-import { EducationalGuides } from "./EducationalGuides";
-import { MethodologyView } from "./MethodologyView";
-import { AboutView } from "./AboutView";
-import { ContactView } from "./ContactView";
-import { LegalPageView } from "./LegalPageView";
-import { GUIDE_ARTICLES } from "../data/siteContent.js";
+import { Share2, Printer, Check } from "lucide-react";
+import { ComplianceModal, CompliancePageType } from "./ComplianceModal";
 import "../nextmovemath.css";
 
-export type ActiveTab = "calculator" | "guides" | "methodology" | "about" | "contact";
 type Mode = "buy" | "sell" | "move" | "rent";
 type Financing = "mortgage" | "heloc";
 
 export interface NextMoveMathCalculatorProps {
-  publisherId: string;
-  simulationMode: boolean;
-  inspectOutlines: boolean;
   country?: "CA" | "US";
   setCountry?: (country: "CA" | "US") => void;
   onShare?: () => void;
   onPrint?: () => void;
   shareToast?: boolean;
-  currentPath?: string;
-  onNavigate?: (path: string, e?: React.MouseEvent) => void;
 }
 
 const paths: { id: Mode; label: string; detail: string }[] = [
@@ -44,7 +33,7 @@ function getMonthlyRate(annualRate: number, isUS = false) {
 }
 
 function monthlyMortgage(principal: number, annualRate: number, years: number, isUS = false) {
-  if (principal <= 0) return 0;
+  if (principal <= 0 || years <= 0) return 0;
   const monthlyRate = getMonthlyRate(annualRate, isUS);
   const payments = years * 12;
   if (monthlyRate === 0) return principal / payments;
@@ -61,7 +50,7 @@ function mortgageBalanceAfter(
   monthsPaid: number,
   isUS = false,
 ) {
-  if (principal <= 0) return 0;
+  if (principal <= 0 || years <= 0) return 0;
   const monthlyRate = getMonthlyRate(annualRate, isUS);
   const payment = monthlyMortgage(principal, annualRate, years, isUS);
   if (monthlyRate === 0) return Math.max(0, principal - payment * monthsPaid);
@@ -121,7 +110,6 @@ function NumericField({
   const [localVal, setLocalVal] = useState<string>(value === 0 ? "" : String(value));
   const [isFocused, setIsFocused] = useState(false);
 
-  // Sync external changes (presets, country toggles, reset) only when the user is not actively typing
   React.useEffect(() => {
     if (!isFocused) {
       setLocalVal(value === 0 ? "" : String(value));
@@ -130,7 +118,6 @@ function NumericField({
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const raw = event.target.value;
-    // Allow empty string, digits, and at most one decimal point
     const cleaned = raw.replace(/[^0-9.]/g, "");
     const parts = cleaned.split(".");
     const sanitized = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join("")}` : cleaned;
@@ -149,7 +136,6 @@ function NumericField({
 
   const handleBlur = () => {
     setIsFocused(false);
-    // On blur, normalize display: if empty or zero, keep empty for placeholder; otherwise strip leading zeroes
     if (localVal === "" || Number(localVal) === 0) {
       setLocalVal("");
       onChange(0);
@@ -200,80 +186,15 @@ function NumericField({
   );
 }
 
-function TextField({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      <div className="input-wrap">
-        <input
-          type="text"
-          value={value}
-          placeholder={placeholder}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      </div>
-    </label>
-  );
-}
-
-function SelectField({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: string[];
-}) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      <div className="input-wrap select-wrap">
-        <select value={value} onChange={(event) => onChange(event.target.value)}>
-          {options.map((option) => (
-            <option key={option}>{option}</option>
-          ))}
-        </select>
-      </div>
-    </label>
-  );
-}
-
 export default function NextMoveMathCalculator({
   country = "CA",
   setCountry,
   onShare,
   onPrint,
   shareToast,
-  currentPath = "/",
-  onNavigate,
 }: NextMoveMathCalculatorProps) {
   const currentCountry = country || "CA";
   const isUS = currentCountry === "US";
-  const [internalPath, setInternalPath] = useState<string>("/");
-  const activePath = currentPath || internalPath;
-
-  const navigate = (path: string, e?: React.MouseEvent) => {
-    if (onNavigate) {
-      onNavigate(path, e);
-    } else {
-      if (e) e.preventDefault();
-      setInternalPath(path);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  };
 
   const money = useMemo(() => {
     return new Intl.NumberFormat(isUS ? "en-US" : "en-CA", {
@@ -283,31 +204,15 @@ export default function NextMoveMathCalculator({
     });
   }, [isUS]);
 
-  const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [mode, setMode] = useState<Mode>("move");
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalModalTab, setLegalModalTab] = useState<CompliancePageType>("terms");
 
-  const handleOpenCalculatorMode = (targetMode: Mode, e?: React.MouseEvent) => {
-    setMode(targetMode);
-    navigate("/", e);
+  const openLegalModal = (tab: CompliancePageType) => {
+    setLegalModalTab(tab);
+    setLegalModalOpen(true);
   };
 
-  const isHomeRoute = activePath === "/";
-  const isGuidesRoute = activePath === "/guides" || activePath.startsWith("/guides/");
-  const guideSlug = activePath.startsWith("/guides/") ? activePath.slice("/guides/".length) : undefined;
-  const isMethodologyRoute = activePath === "/methodology";
-  const isAboutRoute = activePath === "/about";
-  const isContactRoute = activePath === "/contact";
-  const isPrivacyRoute = activePath === "/privacy-policy";
-  const isTermsRoute = activePath === "/terms-of-service";
-  // Fallback unknown paths cleanly to home calculator
-  const showCalculator =
-    isHomeRoute ||
-    (!isGuidesRoute &&
-      !isMethodologyRoute &&
-      !isAboutRoute &&
-      !isContactRoute &&
-      !isPrivacyRoute &&
-      !isTermsRoute);
   const [financing, setFinancing] = useState<Financing>("mortgage");
   const [salePrice, setSalePrice] = useState(900_000);
   const [mortgageOwing, setMortgageOwing] = useState(510_000);
@@ -332,11 +237,6 @@ export default function NextMoveMathCalculator({
   const [purchaseLegal, setPurchaseLegal] = useState(2_200);
   const [inspection, setInspection] = useState(650);
   const [transferTaxes, setTransferTaxes] = useState(0);
-  const [propertyLocation, setPropertyLocation] = useState("Kelowna, BC");
-  const [propertyType, setPropertyType] = useState("Detached home");
-  const [squareFeet, setSquareFeet] = useState(1_850);
-  const [bedrooms, setBedrooms] = useState(3);
-  const [bathrooms, setBathrooms] = useState(2);
   const [helocDraw, setHelocDraw] = useState(75_000);
   const [estimatedRent, setEstimatedRent] = useState(3_400);
   const [currentMortgagePayment, setCurrentMortgagePayment] = useState(3_150);
@@ -352,18 +252,15 @@ export default function NextMoveMathCalculator({
       if (amortization === 25) setAmortization(30);
       if (annualRate === 4.79) setAnnualRate(6.49);
       if (commissionRate === 3.2) setCommissionRate(5.0);
-      if (propertyLocation === "Kelowna, BC") setPropertyLocation("Seattle, WA");
     } else {
       if (amortization === 30) setAmortization(25);
       if (annualRate === 6.49) setAnnualRate(4.79);
       if (commissionRate === 5.0) setCommissionRate(3.2);
-      if (propertyLocation === "Seattle, WA") setPropertyLocation("Kelowna, BC");
     }
   }, [isUS]);
 
   const figures = useMemo(() => {
     const commission = salePrice * (commissionRate / 100);
-    // In Canada, GST/HST applies to commission. In US, direct commission
     const commissionTax = isUS ? 0 : commission * 0.05;
     const sellingCosts =
       commission + commissionTax + prepaymentPenalty + saleLegal + prepCosts + movingCosts;
@@ -385,27 +282,35 @@ export default function NextMoveMathCalculator({
 
     // 5-Year Horizon Calculations (60 months)
     const fiveYearMonths = 60;
-    const mortgageBalanceFiveYears = mortgageBalanceAfter(mortgage, annualRate, amortization, fiveYearMonths, isUS);
+    const mortgageBalanceFiveYears = mortgageBalanceAfter(
+      mortgage,
+      annualRate,
+      amortization,
+      fiveYearMonths,
+      isUS,
+    );
     const fiveYearTotalPayments = payment * fiveYearMonths;
     const fiveYearPrincipalPaid = Math.max(0, mortgage - mortgageBalanceFiveYears);
     const fiveYearInterestPaid = Math.max(0, fiveYearTotalPayments - fiveYearPrincipalPaid);
     const fiveYearHomeEquity = downPayment + fiveYearPrincipalPaid;
 
-    // US Private Mortgage Insurance (PMI) if down payment < 20%
-    const needsPmi = isUS && purchasePrice > 0 && downPayment < purchasePrice * 0.20 && mortgage > 0;
+    // Estimated US Private Mortgage Insurance (PMI) if down payment < 20%
+    const needsPmi = isUS && purchasePrice > 0 && downPayment < purchasePrice * 0.2 && mortgage > 0;
     const pmiMonthly = needsPmi ? (mortgage * 0.0055) / 12 : 0;
 
     const mortgageInterest = payment * amortization * 12 - mortgage;
     const heloc = simulateHeloc(mortgage, helocRate, helocPayment);
     const selectedPayment = financing === "mortgage" ? payment + pmiMonthly : heloc.payment;
-    
-    // Qualifying criteria: Canada stress test (+2%) vs US DTI
+
+    // Qualifying estimate: Canada stress-test illustration (+2%) vs US note rate
     const qualifyingRate = isUS ? annualRate : Math.max(5.25, annualRate + 2);
     const qualifyingPayment = monthlyMortgage(mortgage, qualifyingRate, amortization, isUS);
-    const housingCosts = qualifyingPayment + propertyTax / 12 + heating + condoFees * 0.5 + pmiMonthly;
+    const housingCosts =
+      qualifyingPayment + propertyTax / 12 + heating + condoFees * 0.5 + pmiMonthly;
     const grossMonthlyIncome = householdIncome / 12;
     const gds = grossMonthlyIncome > 0 ? (housingCosts / grossMonthlyIncome) * 100 : 0;
-    const tds = grossMonthlyIncome > 0 ? ((housingCosts + monthlyDebt) / grossMonthlyIncome) * 100 : 0;
+    const tds =
+      grossMonthlyIncome > 0 ? ((housingCosts + monthlyDebt) / grossMonthlyIncome) * 100 : 0;
     const cashAfterMove = Math.max(0, netSale - downPayment - purchaseCosts);
     const standaloneHelocLimit = purchasePrice * 0.65;
     const helocLoanToValue = purchasePrice > 0 ? (mortgage / purchasePrice) * 100 : 0;
@@ -508,74 +413,30 @@ export default function NextMoveMathCalculator({
     isUS,
   ]);
 
-  const helocPayoff =
-    figures.heloc.monthsToPayoff === null
-      ? "Not declining"
-      : `${Math.floor(figures.heloc.monthsToPayoff / 12)} yr ${figures.heloc.monthsToPayoff % 12} mo`;
-
   return (
     <div className="nextmovemath-app homeward-app">
       <main>
-        {/* Single Unified Header / Topbar with Crawlable Anchor Links */}
-        <nav className="topbar">
+        {/* Clean Single-Page Header */}
+        <header className="topbar">
           <div className="topbar-left">
             <a
-              className="brand"
-              href="/"
-              onClick={(e) => navigate("/", e)}
+              className="brand whitespace-nowrap shrink-0"
+              href="#top"
               aria-label="NextMoveMath home"
             >
               <span className="brand-mark">N</span>
               <span>NextMoveMath</span>
             </a>
-
-            <div className="topbar-nav" role="navigation" aria-label="Main navigation">
-              <a
-                href="/"
-                onClick={(e) => navigate("/", e)}
-                className={`nav-link ${showCalculator ? "active" : ""}`}
-              >
-                Calculator
-              </a>
-              <a
-                href="/guides"
-                onClick={(e) => navigate("/guides", e)}
-                className={`nav-link ${isGuidesRoute ? "active" : ""}`}
-              >
-                Guides & Library
-              </a>
-              <a
-                href="/methodology"
-                onClick={(e) => navigate("/methodology", e)}
-                className={`nav-link ${isMethodologyRoute ? "active" : ""}`}
-              >
-                Methodology
-              </a>
-              <a
-                href="/about"
-                onClick={(e) => navigate("/about", e)}
-                className={`nav-link ${isAboutRoute ? "active" : ""}`}
-              >
-                About
-              </a>
-              <a
-                href="/contact"
-                onClick={(e) => navigate("/contact", e)}
-                className={`nav-link ${isContactRoute ? "active" : ""}`}
-              >
-                Contact
-              </a>
-            </div>
           </div>
 
-          {/* Centered Country Selector */}
+          {/* Country Selector */}
           <div className="topbar-center">
             <div className="country-switch-pill" role="group" aria-label="Select Country">
               <button
                 type="button"
                 onClick={() => setCountry?.("CA")}
-                className={`country-btn ${!isUS ? "active" : ""}`}
-                title="Canada: CAD, semi-annual compounding, Stress test (+2%), CMHC and transfer taxes"
+                className={`country-btn whitespace-nowrap shrink-0 ${!isUS ? "active" : ""}`}
+                title="Canada: CAD, semi-annual compounding, stress-test illustration"
               >
                 <span>🇨🇦</span>
                 <span>Canada</span>
@@ -583,8 +444,8 @@ export default function NextMoveMathCalculator({
               <button
                 type="button"
                 onClick={() => setCountry?.("US")}
-                className={`country-btn ${isUS ? "active" : ""}`}
-                title="United States: USD, monthly compounding, DTI guidelines, PMI and escrow"
+                className={`country-btn whitespace-nowrap shrink-0 ${isUS ? "active" : ""}`}
+                title="United States: USD, monthly compounding, DTI illustration"
               >
                 <span>🇺🇸</span>
                 <span>United States</span>
@@ -592,83 +453,49 @@ export default function NextMoveMathCalculator({
             </div>
           </div>
 
-          {/* Right Action Buttons */}
+          {/* Action Buttons */}
           <div className="topbar-actions">
-            {showCalculator ? (
-              <>
-                <button
-                  type="button"
-                  onClick={onShare}
-                  className={`action-btn ${shareToast ? "copied" : ""}`}
-                  title="Copy shareable link with your current calculation numbers"
-                >
-                  {shareToast ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Share2 className="w-3.5 h-3.5" />}
-                  <span>{shareToast ? "Link Copied!" : "Share Move"}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={onPrint}
-                  className="action-btn print-btn"
-                  title="Print or save 1-page financial summary sheet to PDF"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print / PDF</span>
-                </button>
-              </>
-            ) : (
-              <a
-                href="/"
-                onClick={(e) => navigate("/", e)}
-                className="action-btn print-btn cursor-pointer"
-                title="Open interactive calculator"
-              >
-                <CalcIcon className="w-3.5 h-3.5" />
-                <span>Open Calculator</span>
-              </a>
-            )}
+            <button
+              type="button"
+              onClick={onShare}
+              className={`action-btn whitespace-nowrap shrink-0 ${shareToast ? "copied" : ""}`}
+              title="Copy link to share NextMoveMath"
+            >
+              {shareToast ? (
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+              ) : (
+                <Share2 className="w-3.5 h-3.5" />
+              )}
+              <span>{shareToast ? "Link Copied!" : "Share Move"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={onPrint}
+              className="action-btn print-btn whitespace-nowrap shrink-0"
+              title="Print or save 1-page summary sheet to PDF"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print / PDF</span>
+            </button>
           </div>
-        </nav>
+        </header>
 
-        {/* Multi-Page Route Views */}
-        {isGuidesRoute && (
-          <EducationalGuides
-            slug={guideSlug}
-            onNavigate={navigate}
-            onOpenCalculatorMode={handleOpenCalculatorMode}
-            isUS={isUS}
-          />
-        )}
-
-        {isMethodologyRoute && <MethodologyView onNavigate={navigate} />}
-
-        {isAboutRoute && <AboutView onNavigate={navigate} />}
-
-        {isContactRoute && <ContactView onNavigate={navigate} />}
-
-        {isPrivacyRoute && <LegalPageView page="privacy" onNavigate={navigate} />}
-
-        {isTermsRoute && <LegalPageView page="terms" onNavigate={navigate} />}
-
-        {showCalculator && (
-          <>
-            {/* Hero Section */}
-            <section className="hero" id="top">
+        {/* Hero Section */}
+        <section className="hero" id="top">
           <div className="eyebrow">YOUR NEXT MOVE, MADE CLEAR</div>
           <h1>
             Buying a home should feel exciting.
             <span> The math shouldn’t ruin it.</span>
           </h1>
-          {/* Hero Subtitle Card with Warm Background and Badge */}
+
+          {/* Plain English Promise Intro */}
           <div className="hero-subtitle-card">
-            <div className="promise-header">
-              <span className="promise-badge">
-                <span className="promise-badge-dot" />
-                PLAIN ENGLISH PROMISE
-              </span>
-            </div>
             <p>
-              Traditional mortgage calculators only calculate a single payment in a vacuum. NextMoveMath calculates your real moving math in real time: 
-              existing mortgage penalties, realtor commissions, bridge equity, closing adjustments, {isUS ? "DTI qualification guidelines" : "the Canadian stress test"}, and rental vacancy buffers—so you know your actual bottom line before making one of the biggest decisions of your life.
+              Traditional mortgage calculators only calculate a single payment in a vacuum.
+              NextMoveMath estimates your moving numbers side by side in real time—existing mortgage
+              payouts, realtor commissions, net equity rollover, closing costs,{" "}
+              {isUS ? "debt-to-income ratios" : "stress-test estimates"}, and rental cash flow—so
+              you can explore scenarios before talking to your lender or realtor.
             </p>
           </div>
 
@@ -677,40 +504,43 @@ export default function NextMoveMathCalculator({
             <div className="explainer-intro">
               <span className="kicker">THE 4 QUIET COSTS</span>
               <h2>The numbers that usually catch people off guard.</h2>
-              <p>NextMoveMath brings the quiet costs into the open, so the exciting part stays exciting.</p>
+              <p>
+                NextMoveMath brings the quiet costs into the open, so you can plug in your own
+                numbers and test scenarios cleanly.
+              </p>
             </div>
             <div className="explainer-grid">
               <article>
                 <span>01</span>
                 <h3>Selling costs</h3>
                 <p>
-                  Commission, tax on commission, legal fees, discharge fees, mortgage penalties, and moving are all major costs to consider.
+                  Commission, applicable tax on commission, legal fees, discharge fees, mortgage
+                  prepayment penalties, and moving all reduce walk-away equity.
                 </p>
               </article>
               <article>
                 <span>02</span>
                 <h3>Closing costs</h3>
                 <p>
-                  Your down payment isn’t the only cash needed. Local tax, legal fees,
-                  inspections, and other adjustments can arrive before the keys do.
+                  Your down payment isn’t the only cash needed. Local transfer taxes, legal fees,
+                  inspections, and adjustments arrive on or before closing day.
                 </p>
               </article>
               <article>
                 <span>03</span>
-                <h3>{isUS ? "DTI qualification" : "The stress test"}</h3>
+                <h3>{isUS ? "DTI guidelines" : "Stress-test buffer"}</h3>
                 <p>
                   {isUS
-                    ? "US conventional lenders evaluate Front-End DTI (≤28%) and Back-End DTI (≤36%–43%) across your housing and debt payments."
-                    : "Canadian lenders check whether the mortgage fits at the higher of 5.25% or your contract rate plus 2%."}
+                    ? "Lenders commonly compare your housing costs and total monthly debts against your gross income using debt-to-income (DTI) benchmarks."
+                    : "Lenders commonly check whether a mortgage still fits at a higher qualifying rate (for example, 5.25% or your contract rate plus 2%)."}
                 </p>
               </article>
               <article>
                 <span>04</span>
                 <h3>Rental reality</h3>
                 <p>
-                  Potential rent is only the beginning. Vacancy, insurance, maintenance, strata
-                  or HOA costs, management, financing and taxes all affect what the property truly
-                  contributes each month.
+                  Expected rent is only the starting line. Insurance, maintenance, strata or HOA
+                  fees, property management, financing, and taxes shape net monthly cash flow.
                 </p>
               </article>
             </div>
@@ -722,6 +552,7 @@ export default function NextMoveMathCalculator({
               {paths.map((path, index) => (
                 <button
                   key={path.id}
+                  type="button"
                   className={mode === path.id ? "active" : ""}
                   onClick={() => setMode(path.id)}
                   aria-pressed={mode === path.id}
@@ -736,9 +567,10 @@ export default function NextMoveMathCalculator({
             {mode !== "sell" && (
               <div className="financing-picker">
                 <div className="financing-picker-header">
-                  <h3>Two ways to finance your next home (Quick pros & cons)</h3>
+                  <h3>Two ways to finance your next home (Quick pros &amp; cons)</h3>
                   <p>
-                    We help you figure out financing in a few simple ways. Here’s a quick look at the pros and cons of both options so you can pick what fits your next move best:
+                    Compare a traditional amortizing mortgage against a revolving Home Equity Line
+                    of Credit (HELOC) right inside the estimate panel:
                   </p>
                 </div>
                 <div className="financing-options-grid" aria-label="Financing options comparison">
@@ -751,55 +583,53 @@ export default function NextMoveMathCalculator({
                       </div>
                     </div>
                     <p className="card-suited">
-                      <strong>Best for:</strong> Buyers seeking predictable monthly payments, automatic equity growth, and long-term stability.
+                      <strong>Commonly used for:</strong> Predictable scheduled payments and steady
+                      principal paydown over a set amortization period.
                     </p>
                     <ul className="card-points">
                       <li>
                         <span className="icon">✓</span>
-                        <span>Principal & interest paid down in every scheduled payment</span>
+                        <span>Principal &amp; interest paid down in every scheduled payment</span>
                       </li>
                       <li>
                         <span className="icon">✓</span>
-                        <span>Predictable term with defined amortization (e.g., 25–30 yrs)</span>
-                      </li>
-                      <li>
-                        <span className="icon">✓</span>
-                        <span>Qualifies under {isUS ? "standard DTI guidelines" : "the Canadian stress test"}</span>
+                        <span>Structured amortization timeline (e.g., 25–30 years)</span>
                       </li>
                       <li className="warn">
                         <span className="icon">•</span>
-                        <span>Prepayment limits and lender discharge/breakage penalties apply</span>
+                        <span>Prepayment limits and early discharge penalties often apply</span>
                       </li>
                     </ul>
                   </article>
 
-                  {/* Option 2: HELOC (Home Equity Line of Credit) */}
+                  {/* Option 2: HELOC */}
                   <article className="financing-card">
                     <div className="card-top">
                       <div>
                         <span className="card-tag">Flexible Revolving Credit</span>
-                        <h4>HELOC <span className="full-name">(Home Equity Line of Credit)</span></h4>
+                        <h4>
+                          HELOC <span className="full-name">(Home Equity Line of Credit)</span>
+                        </h4>
                       </div>
                     </div>
                     <p className="card-suited">
-                      <strong>Best for:</strong> Homeowners with existing equity who want flexible payment options, completing home renovations, consolidating high-interest debt, etc.
+                      <strong>Commonly used for:</strong> Homeowners with substantial equity who
+                      want open prepayment flexibility.
                     </p>
                     <ul className="card-points">
                       <li>
                         <span className="icon">✓</span>
-                        <span>Interest-only minimum payments keep immediate carrying costs low</span>
+                        <span>Interest-only minimum payments keep baseline obligations flexible</span>
                       </li>
                       <li>
                         <span className="icon">✓</span>
-                        <span>The less you owe, the more available credit you have at any time—with instant access via online banking or debit</span>
-                      </li>
-                      <li>
-                        <span className="icon">✓</span>
-                        <span>Pay off partial or the full principal anytime with no penalties</span>
+                        <span>Pay down extra principal anytime without prepayment penalties</span>
                       </li>
                       <li className="warn">
                         <span className="icon">•</span>
-                        <span>Variable interest rates; balance won't decrease unless extra is paid</span>
+                        <span>
+                          Rates are typically variable, and principal only drops when you pay extra
+                        </span>
                       </li>
                     </ul>
                   </article>
@@ -845,12 +675,15 @@ export default function NextMoveMathCalculator({
                     label="Mortgage penalty"
                     value={prepaymentPenalty}
                     onChange={setPrepaymentPenalty}
-                    hint="Your lender can provide the exact amount."
+                    hint="Your lender can provide your exact payout penalty."
                   />
                 </div>
                 <details>
                   <summary>
-                    Additional selling costs <span className="text-xs text-slate-500 font-normal ml-1.5">(Legal, repairs & staging, moving)</span>
+                    Additional selling costs{" "}
+                    <span className="text-xs text-slate-500 font-normal ml-1.5">
+                      (Legal, repairs &amp; staging, moving)
+                    </span>
                   </summary>
                   <div className="field-grid details-grid">
                     <NumericField
@@ -883,49 +716,15 @@ export default function NextMoveMathCalculator({
                     <span>01</span>
                     <div>
                       <h2>The home you’re keeping</h2>
-                      <p>Start with the property, its equity, and what a realistic rental could bring in.</p>
+                      <p>Enter your current property value, mortgage balance, and any HELOC draw.</p>
                     </div>
                   </div>
-                  <div className="field-grid three-col">
-                    <TextField
-                      label="City, province/state, or ZIP/postal code"
-                      value={propertyLocation}
-                      onChange={setPropertyLocation}
-                      placeholder="Kelowna, BC or Seattle, WA"
-                    />
-                    <SelectField
-                      label="Property type"
-                      value={propertyType}
-                      onChange={setPropertyType}
-                      options={["Detached home", "Townhome", "Condo", "Duplex", "Other"]}
-                    />
-                    <NumericField
-                      label="Approx. square feet"
-                      value={squareFeet}
-                      onChange={setSquareFeet}
-                      prefix=""
-                      suffix="sq. ft."
-                      step={50}
-                    />
-                    <NumericField
-                      label="Bedrooms"
-                      value={bedrooms}
-                      onChange={setBedrooms}
-                      prefix=""
-                      step={1}
-                    />
-                    <NumericField
-                      label="Bathrooms"
-                      value={bathrooms}
-                      onChange={setBathrooms}
-                      prefix=""
-                      step={0.5}
-                    />
+                  <div className="field-grid">
                     <NumericField
                       label="Estimated current value"
                       value={salePrice}
                       onChange={setSalePrice}
-                      hint="Use a recent appraisal or conservative local estimate for now."
+                      hint="Use a conservative market estimate."
                     />
                     <NumericField
                       label="Mortgage currently owing"
@@ -943,7 +742,7 @@ export default function NextMoveMathCalculator({
                       label="HELOC amount to use"
                       value={helocDraw}
                       onChange={setHelocDraw}
-                      hint={`Estimated room currently: ${money.format(figures.estimatedHelocRoom)}`}
+                      hint={`65% LTV illustration room: ${money.format(figures.estimatedHelocRoom)}`}
                     />
                     <NumericField
                       label="HELOC rate"
@@ -952,7 +751,7 @@ export default function NextMoveMathCalculator({
                       prefix=""
                       suffix="%"
                       step={0.05}
-                      hint="Usually variable and often tied to lender prime."
+                      hint="Typically variable."
                     />
                   </div>
                   <div
@@ -961,15 +760,16 @@ export default function NextMoveMathCalculator({
                     }`}
                   >
                     <div>
-                      <span className="kicker">EQUITY CHECK</span>
-                      <strong>{money.format(figures.estimatedHelocRoom)} estimated HELOC room</strong>
+                      <span className="kicker">EQUITY ESTIMATE</span>
+                      <strong>
+                        {money.format(figures.estimatedHelocRoom)} illustrated HELOC room
+                      </strong>
                       <p>
-                        Conservative illustration using a 65% property-value ceiling less the mortgage
-                        owing. Your lender’s appraisal, product structure and approval rules decide the
-                        real amount.
+                        Illustrated using 65% of estimated value minus current mortgage owing.
+                        Actual borrowing limits depend on your lender’s appraisal and product rules.
                       </p>
                     </div>
-                    <span className="data-status">Planning estimate</span>
+                    <span className="data-status">Estimate only</span>
                   </div>
                 </div>
 
@@ -979,8 +779,8 @@ export default function NextMoveMathCalculator({
                     <div>
                       <h2>Your rental picture</h2>
                       <p>
-                        Use a local rent estimate today. Later, this property profile can power live
-                        nearby comparisons.
+                        Enter expected monthly rent and ongoing landlord expenses to estimate net
+                        monthly cash flow.
                       </p>
                     </div>
                   </div>
@@ -1027,21 +827,6 @@ export default function NextMoveMathCalculator({
                       suffix="/mo"
                     />
                   </div>
-                  <div className="market-data-note">
-                    <div>
-                      <span className="kicker">LOCAL MARKET DATA</span>
-                      <strong>
-                        {propertyType} · {bedrooms} bed · {bathrooms} bath ·{" "}
-                        {squareFeet.toLocaleString()} sq. ft.
-                      </strong>
-                      <p>
-                        {propertyLocation || "Add a location"} — live sold-property and rental
-                        comparisons need a licensed, reliable data source. The form is ready; until
-                        connected, every market estimate remains clearly editable.
-                      </p>
-                    </div>
-                    <span className="data-status">Data connection next</span>
-                  </div>
                 </div>
               </>
             )}
@@ -1052,7 +837,7 @@ export default function NextMoveMathCalculator({
                   <span>{mode === "move" ? "02" : mode === "rent" ? "03" : "01"}</span>
                   <div>
                     <h2>Your next home</h2>
-                    <p>Fill in the info below and watch our calculator update instantly!</p>
+                    <p>Fill in the info below and watch the estimate update in real time.</p>
                   </div>
                 </div>
                 <div className="field-grid">
@@ -1079,7 +864,7 @@ export default function NextMoveMathCalculator({
                       label="Down payment from sale proceeds"
                       value={moveDownPayment}
                       onChange={setMoveDownPayment}
-                      hint={`Net sale equity: ${money.format(figures.netSale)}. Estimated cash remaining in your bank after closing: ${money.format(figures.cashAfterMove)}.`}
+                      hint={`Estimated net sale equity: ${money.format(figures.netSale)}. Estimated cash left after closing: ${money.format(figures.cashAfterMove)}.`}
                     />
                   )}
                   {financing === "mortgage" ? (
@@ -1110,21 +895,24 @@ export default function NextMoveMathCalculator({
                         prefix=""
                         suffix="%"
                         step={0.05}
-                        hint="Usually variable and often tied to lender prime."
+                        hint="Typically variable."
                       />
                       <NumericField
                         label="Planned monthly payment"
                         value={helocPayment}
                         onChange={setHelocPayment}
                         step={50}
-                        hint="Paying only interest will not reduce the balance."
+                        hint="Paying only interest will not reduce the principal balance."
                       />
                     </>
                   )}
                 </div>
                 <details>
                   <summary>
-                    Additional purchase costs <span className="text-xs text-slate-500 font-normal ml-1.5">(Legal, inspection, local taxes)</span>
+                    Additional purchase costs{" "}
+                    <span className="text-xs text-slate-500 font-normal ml-1.5">
+                      (Legal, inspection, local taxes)
+                    </span>
                   </summary>
                   <div className="field-grid details-grid">
                     <NumericField
@@ -1144,7 +932,7 @@ export default function NextMoveMathCalculator({
                       value={transferTaxes}
                       onChange={setTransferTaxes}
                       step={500}
-                      hint="Enter a local estimate—this can vary by province, state, municipality, property, and buyer."
+                      hint="Enter a local transfer tax estimate—varies by province, state, municipality, and buyer."
                     />
                   </div>
                 </details>
@@ -1153,37 +941,65 @@ export default function NextMoveMathCalculator({
                 {figures.mortgage > 0 && financing === "mortgage" && (
                   <details className="horizon-details">
                     <summary>
-                      5-Year Equity & Debt Horizon <span className="text-xs text-slate-500 font-normal ml-1.5">(Principal paid, interest & projected equity at 5 years)</span>
+                      5-Year Equity &amp; Debt Horizon{" "}
+                      <span className="text-xs text-slate-500 font-normal ml-1.5">
+                        (Principal paid, interest &amp; projected equity at 5 years)
+                      </span>
                     </summary>
                     <div className="horizon-dropdown-content">
                       <div className="horizon-stats-grid">
                         <div className="horizon-stat-box">
                           <span className="label">Principal Paid</span>
-                          <span className="value">{money.format(figures.fiveYearPrincipalPaid)}</span>
+                          <span className="value tabular-nums">
+                            {money.format(figures.fiveYearPrincipalPaid)}
+                          </span>
                         </div>
                         <div className="horizon-stat-box">
                           <span className="label">Interest Paid</span>
-                          <span className="value">{money.format(figures.fiveYearInterestPaid)}</span>
+                          <span className="value tabular-nums">
+                            {money.format(figures.fiveYearInterestPaid)}
+                          </span>
                         </div>
                         <div className="horizon-stat-box">
                           <span className="label">Balance in 5 Yrs</span>
-                          <span className="value">{money.format(figures.mortgageBalanceFiveYears)}</span>
+                          <span className="value tabular-nums">
+                            {money.format(figures.mortgageBalanceFiveYears)}
+                          </span>
                         </div>
                         <div className="horizon-stat-box highlight">
                           <span className="label">Projected Equity</span>
-                          <span className="value">{money.format(figures.fiveYearHomeEquity)}</span>
+                          <span className="value tabular-nums">
+                            {money.format(figures.fiveYearHomeEquity)}
+                          </span>
                         </div>
                       </div>
                       <div className="horizon-progress-container">
                         <div className="horizon-progress-label">
                           <span>Principal vs Interest Split</span>
-                          <span>{((figures.fiveYearPrincipalPaid / (figures.fiveYearPrincipalPaid + figures.fiveYearInterestPaid || 1)) * 100).toFixed(0)}% to Principal</span>
+                          <span className="tabular-nums">
+                            {(
+                              (figures.fiveYearPrincipalPaid /
+                                (figures.fiveYearPrincipalPaid + figures.fiveYearInterestPaid ||
+                                  1)) *
+                              100
+                            ).toFixed(0)}
+                            % to Principal
+                          </span>
                         </div>
                         <div className="horizon-progress-bar">
                           <div
                             className="horizon-progress-fill"
                             style={{
-                              width: `${Math.min(100, Math.max(5, (figures.fiveYearPrincipalPaid / (figures.fiveYearPrincipalPaid + figures.fiveYearInterestPaid || 1)) * 100))}%`
+                              width: `${Math.min(
+                                100,
+                                Math.max(
+                                  5,
+                                  (figures.fiveYearPrincipalPaid /
+                                    (figures.fiveYearPrincipalPaid + figures.fiveYearInterestPaid ||
+                                      1)) *
+                                    100,
+                                ),
+                              )}%`,
                             }}
                           />
                         </div>
@@ -1208,7 +1024,7 @@ export default function NextMoveMathCalculator({
                     label="Annual gross household income"
                     value={householdIncome}
                     onChange={setHouseholdIncome}
-                    hint="Your total household income before tax for the year—we divide it by 12 for this monthly comparison."
+                    hint="Total household income before tax—divided by 12 for this monthly comparison."
                   />
                   <NumericField
                     label="Other monthly debt"
@@ -1237,110 +1053,136 @@ export default function NextMoveMathCalculator({
                 </div>
                 {(() => {
                   const totalShare = figures.enteredTotalShare;
-                  const comfortStatus = totalShare <= 36 ? "good" : totalShare <= 44 ? "watch" : "high";
+                  const comfortStatus =
+                    totalShare <= 36 ? "good" : totalShare <= 44 ? "watch" : "high";
                   const statusLabel =
                     totalShare <= 36
                       ? "Comfortable planning range"
                       : totalShare <= 44
-                      ? "Manageable but Tight"
-                      : "Above Standard Lender Limits";
+                      ? "Manageable but tight"
+                      : "High monthly commitment";
 
                   return (
                     <div className={`comfort-summary status-${comfortStatus}`}>
-                      {/* Top Row: Aligned Gross Income and Monthly Expenses with Combined Total Commitments */}
                       <div className="comfort-topline-grid">
                         <div className="comfort-stat-card">
                           <span className="kicker">GROSS MONTHLY INCOME</span>
-                          <strong className="amount-display">
+                          <strong className="amount-display tabular-nums">
                             {money.format(householdIncome / 12)}
                             <small>/mo</small>
                           </strong>
-                          <span className="stat-subtext">Before taxes ({money.format(householdIncome)}/year)</span>
+                          <span className="stat-subtext">
+                            Before taxes ({money.format(householdIncome)}/year)
+                          </span>
                         </div>
 
                         <div className="comfort-stat-card">
                           <span className="kicker">MONTHLY TOTAL EXPENSES</span>
-                          <strong className="amount-display">
+                          <strong className="amount-display tabular-nums">
                             {money.format(figures.enteredMonthlyTotal)}
                             <small>/mo</small>
                           </strong>
                           <span className="stat-subtext font-semibold text-[#17312d]">
-                            Housing ({money.format(figures.enteredHousingTotal)}) + Debts ({money.format(monthlyDebt)})
+                            Housing ({money.format(figures.enteredHousingTotal)}) + Debts (
+                            {money.format(monthlyDebt)})
                           </span>
                           <span className="text-[11px] text-[#556963] mt-1 block leading-tight">
-                            Includes Mortgage ({money.format(figures.selectedPayment)}) + Taxes ({money.format(propertyTax / 12)}) + Heating ({money.format(heating)}){condoFees > 0 ? ` + Strata (${money.format(condoFees)})` : ""}
+                            Includes Payment ({money.format(figures.selectedPayment)}) + Taxes (
+                            {money.format(propertyTax / 12)}) + Heating ({money.format(heating)})
+                            {condoFees > 0 ? ` + Strata/HOA (${money.format(condoFees)})` : ""}
                           </span>
                         </div>
 
-                        <div className={`comfort-stat-card commitment-status-card ${comfortStatus}`}>
+                        <div
+                          className={`comfort-stat-card commitment-status-card ${comfortStatus}`}
+                        >
                           <span className="kicker">TOTAL COMMITMENTS</span>
-                          <strong className="amount-display">
-                            {totalShare.toFixed(1)}%
-                            <small>of income</small>
+                          <strong className="amount-display tabular-nums">
+                            {totalShare.toFixed(1)}%<small>of income</small>
                           </strong>
                           <div className={`comfort-status-pill ${comfortStatus}`}>
-                            <span className="status-dot" />
                             <span>{statusLabel}</span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Second Row: GDS and TDS Side-by-Side Informational Cards */}
+                      {/* GDS / TDS or Front / Back DTI Informational Cards */}
                       <div className="dti-explanation-grid">
-                        {/* GDS Card */}
-                        <div className={`dti-card ${figures.gds <= (isUS ? 28 : 39) ? "good" : "watch"}`}>
+                        <div
+                          className={`dti-card ${
+                            figures.gds <= (isUS ? 28 : 39) ? "good" : "watch"
+                          }`}
+                        >
                           <div className="dti-card-header">
                             <div>
                               <span className="dti-type-tag">HOUSING EXPENSE RATIO</span>
-                              <h4>{isUS ? "Front-End DTI (Housing Ratio)" : "GDS (Gross Debt Service)"}</h4>
+                              <h4>
+                                {isUS ? "Front-End DTI (Housing)" : "GDS (Gross Debt Service)"}
+                              </h4>
                             </div>
-                            <div className="dti-ratio-badge">
+                            <div className="dti-ratio-badge tabular-nums">
                               <strong>{figures.gds.toFixed(1)}%</strong>
-                              <small>{isUS ? "Lender Guide: ≤28%" : "Lender Guide: ≤39%"}</small>
+                              <small>
+                                {isUS ? "Common guide: ≤28%" : "Common guide: ≤39%"}
+                              </small>
                             </div>
                           </div>
                           <p className="dti-description">
                             {isUS
-                              ? "The percentage of gross income allocated strictly to housing payments (mortgage principal, interest, taxes, insurance, and HOA). Most conventional lenders look for 28% or lower to ensure housing alone doesn't overwhelm your monthly budget."
-                              : "The percentage of your pre-tax monthly income required to cover housing costs alone (mortgage P&I, property taxes, heating, and 50% of condo fees). Canadian lenders use 39% as the maximum benchmark to qualify you for a prime mortgage."}
+                              ? "Estimated share of gross monthly income allocated to housing costs. Many conventional lenders use ~28% as a general reference point, though actual limits vary by loan program."
+                              : "Estimated share of pre-tax monthly income allocated to qualifying housing costs (evaluated using the stress-test rate, taxes, heating, and half of condo fees). Actual lender limits vary."}
                           </p>
                         </div>
 
-                        {/* TDS Card */}
-                        <div className={`dti-card ${figures.tds <= (isUS ? 43 : 44) ? "good" : "watch"}`}>
+                        <div
+                          className={`dti-card ${
+                            figures.tds <= (isUS ? 43 : 44) ? "good" : "watch"
+                          }`}
+                        >
                           <div className="dti-card-header">
                             <div>
-                              <span className="dti-type-tag">TOTAL DEBT COMMITMENT RATIO</span>
-                              <h4>{isUS ? "Back-End DTI (Total Debt Ratio)" : "TDS (Total Debt Service)"}</h4>
+                              <span className="dti-type-tag">TOTAL DEBT RATIO</span>
+                              <h4>
+                                {isUS ? "Back-End DTI (Total Debt)" : "TDS (Total Debt Service)"}
+                              </h4>
                             </div>
-                            <div className="dti-ratio-badge">
+                            <div className="dti-ratio-badge tabular-nums">
                               <strong>{figures.tds.toFixed(1)}%</strong>
-                              <small>{isUS ? "Lender Guide: ≤36%–43%" : "Lender Guide: ≤44%"}</small>
+                              <small>
+                                {isUS ? "Common guide: ≤36%–43%" : "Common guide: ≤44%"}
+                              </small>
                             </div>
                           </div>
                           <p className="dti-description">
                             {isUS
-                              ? "The percentage of gross income needed to cover all housing costs PLUS all other monthly debt obligations (car loans, credit cards, student debt). Lenders use back-end DTI to set your ultimate qualification ceiling."
-                              : "The percentage of your pre-tax monthly income needed to cover your housing costs PLUS all other monthly debt obligations (car loans, student loans, credit card balances, lines of credit). In Canada, 44% is the hard ceiling for prime mortgage approval."}
+                              ? "Estimated share of gross monthly income needed for housing costs plus recurring monthly debts. Actual lender thresholds depend on credit profile, reserves, and loan type."
+                              : "Estimated share of pre-tax monthly income needed for qualifying housing costs plus other monthly debt obligations. Actual underwriting rules vary by lender and borrower."}
                           </p>
                         </div>
                       </div>
 
-                      {/* Visual Dynamic Correlation Gauge */}
+                      {/* Visual Gauge */}
                       <div
                         className="comfort-track"
-                        aria-label={`Total commitments are ${totalShare.toFixed(1)} percent of gross income`}
+                        aria-label={`Total commitments are ${totalShare.toFixed(
+                          1,
+                        )} percent of gross income`}
                       >
                         <span className="comfort-divider first" aria-hidden="true" />
                         <span className="comfort-divider second" aria-hidden="true" />
                         <i
                           style={{
                             left: `${Math.min(100, Math.max(0, totalShare))}%`,
-                            background: comfortStatus === "good" ? "#2e7450" : comfortStatus === "watch" ? "#d97706" : "#dc2626",
+                            background:
+                              comfortStatus === "good"
+                                ? "#2e7450"
+                                : comfortStatus === "watch"
+                                ? "#d97706"
+                                : "#dc2626",
                           }}
                         />
                       </div>
-                      <div className="comfort-scale">
+                      <div className="comfort-scale tabular-nums">
                         <span>0%</span>
                         <span>32%</span>
                         <span>44%</span>
@@ -1356,13 +1198,14 @@ export default function NextMoveMathCalculator({
                           <small>32–44%</small>
                         </span>
                         <span className="red">
-                          <strong>Above standard lender limits</strong>
-                          <small>44–100%</small>
+                          <strong>Stretched range</strong>
+                          <small>44%+</small>
                         </span>
                       </div>
                       <p>
-                        A practical planning target is around 32% or less for mortgage, property tax, heat and condo fees. 
-                        Lender qualification guidelines ({isUS ? "28% Front / 36-43% Back DTI" : "39% GDS / 44% TDS"}) represent approval thresholds—not guarantees that a budget will feel comfortable.
+                        Many households aim for around 32% or less of gross income for housing so
+                        day-to-day life still has breathing room. All ratios shown here are
+                        general planning illustrations, not lender qualification decisions.
                       </p>
                     </div>
                   );
@@ -1380,489 +1223,307 @@ export default function NextMoveMathCalculator({
               <div className="results-panel-header">
                 <span className="results-label">YOUR ESTIMATE</span>
                 {mode !== "sell" && (
-                  <div className="results-financing-toggle" role="group" aria-label="Select Financing Type">
+                  <div
+                    className="results-financing-toggle"
+                    role="group"
+                    aria-label="Select Financing Type"
+                  >
                     <button
                       type="button"
-                      className={`toggle-option ${financing === "mortgage" ? "active" : ""}`}
+                      className={`toggle-option whitespace-nowrap ${
+                        financing === "mortgage" ? "active" : ""
+                      }`}
                       onClick={() => setFinancing("mortgage")}
                     >
                       Mortgage
                     </button>
-                  <button
-                    type="button"
-                    className={`toggle-option ${financing === "heloc" ? "active" : ""}`}
-                    onClick={() => setFinancing("heloc")}
-                  >
-                    HELOC
-                  </button>
-                </div>
-              )}
-            </div>
-            {mode === "sell" ? (
-              <>
-                <p className="result-title">Estimated cash after sale</p>
-                <div className="big-number">{money.format(figures.netSale)}</div>
-                <div className="quip">
-                  {figures.netSale >= 300_000
-                    ? "That equity came prepared."
-                    : "Now you can plan with the real number."}
-                </div>
-                <div className="breakdown">
-                  <div>
-                    <span>Sale price</span>
-                    <strong>{money.format(salePrice)}</strong>
-                  </div>
-                  <div>
-                    <span>Mortgage paid out</span>
-                    <strong>− {money.format(mortgageOwing)}</strong>
-                  </div>
-                  <div>
-                    <span>Estimated selling costs</span>
-                    <strong>− {money.format(figures.sellingCosts)}</strong>
-                  </div>
-                </div>
-              </>
-            ) : mode === "rent" ? (
-              <>
-                <h3 className="sidebar-section-title">New home purchase</h3>
-                <div className="breakdown purchase-breakdown">
-                  <div>
-                    <span>Purchase price</span>
-                    <strong>{money.format(purchasePrice)}</strong>
-                  </div>
-                  <div>
-                    <span>HELOC used for down payment</span>
-                    <strong>{money.format(figures.usableHelocDraw)}</strong>
-                  </div>
-                  <div>
-                    <span>Cash down payment</span>
-                    <strong>{money.format(cashDown)}</strong>
-                  </div>
-                  <div>
-                    <span>Total down payment</span>
-                    <strong>{money.format(figures.downPayment)}</strong>
-                  </div>
-                  <div>
-                    <span>New-home amount financed</span>
-                    <strong>{money.format(figures.mortgage)}</strong>
-                  </div>
-                  <div className="purchase-payment-total">
-                    <span>New home payment</span>
-                    <strong>{money.format(figures.selectedPayment)}/mo</strong>
-                  </div>
-                </div>
-                <h3 className="sidebar-section-title rental-title">Current home rental</h3>
-                <div className="breakdown rental-breakdown">
-                  <div>
-                    <span>Expected monthly rent</span>
-                    <strong>{money.format(figures.effectiveRent)}</strong>
-                  </div>
-                  <div>
-                    <span>Rental operating costs</span>
-                    <strong>− {money.format(figures.rentalOperatingCosts)}</strong>
-                  </div>
-                  <div>
-                    <span>Current mortgage payment</span>
-                    <strong>− {money.format(currentMortgagePayment)}</strong>
-                  </div>
-                  <div>
-                    <span>HELOC interest estimate</span>
-                    <strong>− {money.format(figures.currentHomeHelocInterest)}</strong>
-                  </div>
-                </div>
-                {financing === "heloc" && (
-                  <div
-                    className={`heloc-limit ${
-                      figures.mortgage <= figures.standaloneHelocLimit ? "good" : "watch"
-                    }`}
-                  >
-                    <span>New-home HELOC loan-to-value</span>
-                    <strong>{figures.helocLoanToValue.toFixed(1)}%</strong>
-                    <small>
-                      A standalone HELOC is generally limited to 65% of the new home’s value. A
-                      combined mortgage-and-HELOC product may be structured differently.
-                    </small>
+                    <button
+                      type="button"
+                      className={`toggle-option whitespace-nowrap ${
+                        financing === "heloc" ? "active" : ""
+                      }`}
+                      onClick={() => setFinancing("heloc")}
+                    >
+                      HELOC
+                    </button>
                   </div>
                 )}
-                <div className="rental-cashflow-total">
-                  <div className="sidebar-total-row">
-                    <span>Rental cash flow</span>
-                    <strong className={figures.rentalCashFlow >= 0 ? "positive" : "negative"}>
-                      {figures.rentalCashFlow >= 0 ? "+ " : "− "}
-                      {money.format(Math.abs(figures.rentalCashFlow))}/mo
-                    </strong>
+              </div>
+
+              {mode === "sell" ? (
+                <>
+                  <p className="result-title">Estimated cash after sale</p>
+                  <div className="big-number tabular-nums">{money.format(figures.netSale)}</div>
+                  <div className="quip">
+                    {figures.netSale >= 300_000
+                      ? "That equity came prepared."
+                      : "Now you can plan with a clearer number."}
                   </div>
-                </div>
-                <div className="equation-operator" aria-hidden="true">
-                  {figures.rentalCashFlow >= 0 ? "−" : "+"}
-                </div>
-                <div className="rent-final-payment">
-                  <div className="final-payment-input">
-                    <span>New home payment</span>
-                    <strong>{money.format(figures.selectedPayment)}/mo</strong>
-                  </div>
-                  <div className="rent-final-result">
-                    <p className="result-title">Final estimated monthly payment</p>
-                    <div className="big-number">
-                      {money.format(Math.max(0, figures.combinedMonthlyGap))}
-                      <small>/mo</small>
+                  <div className="breakdown tabular-nums">
+                    <div>
+                      <span>Sale price</span>
+                      <strong>{money.format(salePrice)}</strong>
+                    </div>
+                    <div>
+                      <span>Mortgage paid out</span>
+                      <strong>− {money.format(mortgageOwing)}</strong>
+                    </div>
+                    <div>
+                      <span>Estimated selling costs</span>
+                      <strong>− {money.format(figures.sellingCosts)}</strong>
                     </div>
                   </div>
-                </div>
-                <p className="stress-note">
-                  Rental income treatment, HELOC approval and mortgage qualification vary by lender.
-                  This is a planning view, not a qualification result.
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="result-title">
-                  {financing === "mortgage"
-                    ? "Estimated monthly mortgage"
-                    : "Planned monthly HELOC payment"}
-                </p>
-                <div className="big-number">
-                  {money.format(figures.selectedPayment)}
-                  <small>/mo</small>
-                </div>
-                {financing === "heloc" && (
-                  <div className="quip">
-                    {figures.heloc.firstPrincipal > 0
-                      ? "This payment reduces the balance in the first month."
-                      : "An interest-only payment leaves the balance unchanged."}
+                </>
+              ) : mode === "rent" ? (
+                <>
+                  <h3 className="sidebar-section-title">New home purchase</h3>
+                  <div className="breakdown purchase-breakdown tabular-nums">
+                    <div>
+                      <span>Purchase price</span>
+                      <strong>{money.format(purchasePrice)}</strong>
+                    </div>
+                    <div>
+                      <span>HELOC used for down payment</span>
+                      <strong>{money.format(figures.usableHelocDraw)}</strong>
+                    </div>
+                    <div>
+                      <span>Cash down payment</span>
+                      <strong>{money.format(cashDown)}</strong>
+                    </div>
+                    <div>
+                      <span>Total down payment</span>
+                      <strong>{money.format(figures.downPayment)}</strong>
+                    </div>
+                    <div>
+                      <span>New-home amount financed</span>
+                      <strong>{money.format(figures.mortgage)}</strong>
+                    </div>
+                    <div className="purchase-payment-total">
+                      <span>New home payment</span>
+                      <strong>{money.format(figures.selectedPayment)}/mo</strong>
+                    </div>
                   </div>
-                )}
-                <div className="breakdown">
-                  <div>
-                    <span>Down payment</span>
-                    <strong>{money.format(figures.downPayment)}</strong>
-                  </div>
-                  <div>
-                    <span>Amount financed</span>
-                    <strong>{money.format(figures.mortgage)}</strong>
+                  <h3 className="sidebar-section-title rental-title">Current home rental</h3>
+                  <div className="breakdown rental-breakdown tabular-nums">
+                    <div>
+                      <span>Expected monthly rent</span>
+                      <strong>{money.format(figures.effectiveRent)}</strong>
+                    </div>
+                    <div>
+                      <span>Rental operating costs</span>
+                      <strong>− {money.format(figures.rentalOperatingCosts)}</strong>
+                    </div>
+                    <div>
+                      <span>Current mortgage payment</span>
+                      <strong>− {money.format(currentMortgagePayment)}</strong>
+                    </div>
+                    <div>
+                      <span>HELOC interest estimate</span>
+                      <strong>− {money.format(figures.currentHomeHelocInterest)}</strong>
+                    </div>
                   </div>
                   {financing === "heloc" && (
-                    <>
-                      <div>
-                        <span>First month’s interest</span>
-                        <strong>{money.format(figures.heloc.firstInterest)}</strong>
-                      </div>
-                      <div>
-                        <span>First month’s principal</span>
-                        <strong>{money.format(figures.heloc.firstPrincipal)}</strong>
-                      </div>
-                    </>
-                  )}
-                  <div>
-                    <span>Local tax</span>
-                    <strong>{money.format(figures.transferTaxes)}</strong>
-                  </div>
-                  <div>
-                    <span>Estimated purchase costs</span>
-                    <strong>{money.format(figures.purchaseCosts)}</strong>
-                  </div>
-                  {mode === "move" && (
-                    <div>
-                      <span>Cash left after the move</span>
-                      <strong>{money.format(figures.cashAfterMove)}</strong>
-                    </div>
-                  )}
-                </div>
-                {financing === "mortgage" ? (
-                  <>
-                    {figures.needsPmi && (
-                      <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-2">
-                        Includes estimated US PMI of ~{money.format(figures.pmiMonthly)}/mo (under 20% down payment).
-                      </p>
-                    )}
-                    <p className="stress-note">
-                      {isUS
-                        ? `Standard qualifying rate evaluated at contract rate ${annualRate.toFixed(2)}%.`
-                        : `Canadian stress-tested at ${figures.qualifyingRate.toFixed(2)}% (contract + 2%).`}
-                    </p>
-                  </>
-                ) : (
-                  <div
-                    className={`heloc-limit ${
-                      figures.mortgage <= figures.standaloneHelocLimit ? "good" : "watch"
-                    }`}
-                  >
-                    <span>Estimated loan-to-value</span>
-                    <strong>{figures.helocLoanToValue.toFixed(1)}%</strong>
-                    <small>
-                      {figures.mortgage <= figures.standaloneHelocLimit
-                        ? `Within the general 65% standalone HELOC ceiling (${money.format(
-                            figures.standaloneHelocLimit,
-                          )} here). Approval still varies.`
-                        : `Above the general 65% standalone HELOC ceiling (${money.format(
-                            figures.standaloneHelocLimit,
-                          )} here). A larger down payment or combined product may be needed.`}
-                    </small>
-                  </div>
-                )}
-              </>
-            )}
-          </aside>
-        </div>
-      </section>
-
-        {/* SEO Scenario & FAQ Accordion Section */}
-        <section className="faq-section" id="faqs">
-          <div className="faq-header">
-            <h2>Real Questions & Scenarios</h2>
-          </div>
-
-          <div className="faq-editorial-layout">
-            <div className="faq-list">
-              {[
-                {
-                  q: "How do I calculate net proceeds when selling and buying at the same time?",
-                  a: "Your net equity isn't just your sale price minus your mortgage balance. NextMoveMath subtracts realtor commissions (and applicable sales tax), mortgage prepayment break penalties (typically 3 months interest or Interest Rate Differential), legal fees and title discharges, plus home staging or moving costs. The remainder is your true bridge down payment for your next home.",
-                },
-                {
-                  q: "Can I keep my current home as a rental and pull equity out for my next down payment?",
-                  a: "Yes. Homeowners frequently use a Home Equity Line of Credit (HELOC) or refinance up to 65%–80% of their existing home's value to fund their next down payment. However, you must account for rental vacancy buffers, property taxes, HOA/strata fees, and maintenance. Lenders typically only count 50%–70% of gross market rent toward your qualifying debt-service ratios.",
-                },
-                {
-                  q: isUS ? "What is the standard Debt-to-Income (DTI) ratio in the United States?" : "What is the Canadian mortgage stress test (+2%)?",
-                  a: isUS
-                    ? "In the United States, conventional conforming mortgages (Fannie Mae & Freddie Mac) evaluate two metrics: Front-End DTI (housing costs shouldn't exceed 28% of gross income) and Back-End DTI (total debt payments including student loans, cars, and credit cards shouldn't exceed 36% to 43% of gross income)."
-                    : "In Canada, federal rules (OSFI) require every borrower to qualify at the higher of 5.25% or their actual contract rate plus 2.0%. This ensures you could still afford your monthly payment if interest rates rise upon 5-year renewal.",
-                },
-                {
-                  q: "What are the 'quiet closing costs' that catch buyers off guard?",
-                  a: `Your down payment is only part of the cash required on closing day. Quiet costs include ${isUS ? "county transfer stamps, title insurance, escrow settlement fees" : "provincial land transfer taxes (PTT/LTT), legal disbursements, title insurance"}, home inspections, property tax adjustments, and utility hookups. These generally add 1.5% to 3.5% of the purchase price on top of your down payment.`,
-                },
-                {
-                  q: "What is mortgage porting, and when does it make financial sense?",
-                  a: "Porting allows you to transfer your existing mortgage interest rate, term, and balance from your current property to your new home. If your current rate is lower than prevailing market rates, porting saves you from paying thousands in prepayment break penalties. If you need more money, lenders usually provide a 'blend-and-extend' rate on the additional amount.",
-                },
-              ].map((faq, idx) => (
-                <div key={idx} className="faq-item">
-                  <button
-                    type="button"
-                    onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
-                    className="faq-question-btn"
-                    aria-expanded={openFaq === idx}
-                  >
-                    <span>{faq.q}</span>
-                    <span className="text-emerald-700 text-xl font-mono">{openFaq === idx ? "−" : "+"}</span>
-                  </button>
-                  {openFaq === idx && (
-                    <div className="faq-answer">
-                      <p>{faq.a}</p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Editorial Deep-Dive Sidebar Links */}
-            <aside className="faq-sidebar-column">
-              <div className="bg-white border border-[rgba(23,49,45,0.14)] rounded-2xl p-6 shadow-sm">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#e7f2e9] text-[#2e7450] text-[11px] font-bold uppercase tracking-wider mb-3">
-                  <BookOpen className="w-3.5 h-3.5" />
-                  <span>Editorial Library</span>
-                </div>
-                <h3 className="text-xl font-serif font-bold text-[#17312d] m-0 mb-2">
-                  Read the Worked Moving Math Guides
-                </h3>
-                <p className="text-xs text-[#556862] leading-relaxed mb-4">
-                  Explore step-by-step formulas, statutory compounding rules, and line-by-line closing cost tables.
-                </p>
-                <div className="space-y-2.5 mb-5">
-                  {GUIDE_ARTICLES.slice(0, 4).map((guide) => (
-                    <a
-                      key={guide.slug}
-                      href={`/guides/${guide.slug}`}
-                      onClick={(e) => navigate(`/guides/${guide.slug}`, e)}
-                      className="block p-3 rounded-xl bg-[#fffdf8] border border-[rgba(23,49,45,0.1)] hover:border-[#2e7450] transition-colors no-underline group"
+                    <div
+                      className={`heloc-limit ${
+                        figures.mortgage <= figures.standaloneHelocLimit ? "good" : "watch"
+                      }`}
                     >
-                      <span className="block text-[10px] font-bold uppercase tracking-wider text-[#ec715a] mb-0.5">
-                        {guide.badge} · {guide.readTime}
-                      </span>
-                      <span className="block text-xs font-bold text-[#17312d] group-hover:text-[#2e7450] leading-snug">
-                        {guide.title}
-                      </span>
-                    </a>
-                  ))}
-                </div>
-                <a
-                  href="/guides"
-                  onClick={(e) => navigate("/guides", e)}
-                  className="inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl bg-[#17312d] hover:bg-[#234741] text-white text-xs font-bold transition-colors no-underline"
-                >
-                  <span>Browse All {GUIDE_ARTICLES.length} Math Guides</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </a>
-              </div>
+                      <span>New-home HELOC loan-to-value</span>
+                      <strong className="tabular-nums">
+                        {figures.helocLoanToValue.toFixed(1)}%
+                      </strong>
+                      <small>
+                        Standalone HELOCs are commonly capped near 65% of property value, though
+                        combined mortgage-HELOC products vary by lender.
+                      </small>
+                    </div>
+                  )}
+                  <div className="rental-cashflow-total tabular-nums">
+                    <div className="sidebar-total-row">
+                      <span>Rental cash flow</span>
+                      <strong className={figures.rentalCashFlow >= 0 ? "positive" : "negative"}>
+                        {figures.rentalCashFlow >= 0 ? "+ " : "− "}
+                        {money.format(Math.abs(figures.rentalCashFlow))}/mo
+                      </strong>
+                    </div>
+                  </div>
+                  <div className="equation-operator" aria-hidden="true">
+                    {figures.rentalCashFlow >= 0 ? "−" : "+"}
+                  </div>
+                  <div className="rent-final-payment tabular-nums">
+                    <div className="final-payment-input">
+                      <span>New home payment</span>
+                      <strong>{money.format(figures.selectedPayment)}/mo</strong>
+                    </div>
+                    <div className="rent-final-result">
+                      <p className="result-title">Final estimated monthly outlay</p>
+                      <div className="big-number">
+                        {money.format(Math.max(0, figures.combinedMonthlyGap))}
+                        <small>/mo</small>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="stress-note">
+                    Illustrative estimate only. Rental income offsets, HELOC limits, and mortgage
+                    qualification vary by lender.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="result-title">
+                    {financing === "mortgage"
+                      ? "Estimated monthly mortgage"
+                      : "Planned monthly HELOC payment"}
+                  </p>
+                  <div className="big-number tabular-nums">
+                    {money.format(figures.selectedPayment)}
+                    <small>/mo</small>
+                  </div>
+                  {financing === "heloc" && (
+                    <div className="quip">
+                      {figures.heloc.firstPrincipal > 0
+                        ? "This payment reduces the balance in the first month."
+                        : "An interest-only payment leaves the balance unchanged."}
+                    </div>
+                  )}
+                  <div className="breakdown tabular-nums">
+                    <div>
+                      <span>Down payment</span>
+                      <strong>{money.format(figures.downPayment)}</strong>
+                    </div>
+                    <div>
+                      <span>Amount financed</span>
+                      <strong>{money.format(figures.mortgage)}</strong>
+                    </div>
+                    {financing === "heloc" && (
+                      <>
+                        <div>
+                          <span>First month’s interest</span>
+                          <strong>{money.format(figures.heloc.firstInterest)}</strong>
+                        </div>
+                        <div>
+                          <span>First month’s principal</span>
+                          <strong>{money.format(figures.heloc.firstPrincipal)}</strong>
+                        </div>
+                      </>
+                    )}
+                    <div>
+                      <span>Local tax</span>
+                      <strong>{money.format(figures.transferTaxes)}</strong>
+                    </div>
+                    <div>
+                      <span>Estimated purchase costs</span>
+                      <strong>{money.format(figures.purchaseCosts)}</strong>
+                    </div>
+                    {mode === "move" && (
+                      <div>
+                        <span>Cash left after the move</span>
+                        <strong>{money.format(figures.cashAfterMove)}</strong>
+                      </div>
+                    )}
+                  </div>
+                  {financing === "mortgage" ? (
+                    <>
+                      {figures.needsPmi && (
+                        <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-2">
+                          Includes estimated US PMI illustration of ~
+                          {money.format(figures.pmiMonthly)}/mo (under 20% down payment).
+                        </p>
+                      )}
+                      <p className="stress-note">
+                        {isUS
+                          ? `Illustrated at entered rate of ${annualRate.toFixed(2)}%.`
+                          : `Stress-test ratio illustrated at ${figures.qualifyingRate.toFixed(
+                              2,
+                            )}% (higher of 5.25% or rate + 2%).`}
+                      </p>
+                    </>
+                  ) : (
+                    <div
+                      className={`heloc-limit ${
+                        figures.mortgage <= figures.standaloneHelocLimit ? "good" : "watch"
+                      }`}
+                    >
+                      <span>Estimated loan-to-value</span>
+                      <strong className="tabular-nums">
+                        {figures.helocLoanToValue.toFixed(1)}%
+                      </strong>
+                      <small>
+                        {figures.mortgage <= figures.standaloneHelocLimit
+                          ? `Within a typical 65% standalone HELOC ceiling (${money.format(
+                              figures.standaloneHelocLimit,
+                            )}). Lender terms vary.`
+                          : `Above a typical 65% standalone HELOC ceiling (${money.format(
+                              figures.standaloneHelocLimit,
+                            )}). A larger down payment or combined product may be required.`}
+                      </small>
+                    </div>
+                  )}
+                </>
+              )}
             </aside>
           </div>
         </section>
 
-        {/* Featured Editorial Guides Hub Section on Homepage */}
-        <section className="max-w-[1080px] w-[calc(100%-40px)] mx-auto mb-20">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
-            <div>
-              <span className="eyebrow block mb-2">IN-DEPTH MOVING & MORTGAGE LIBRARY</span>
-              <h2 className="text-2xl sm:text-4xl font-serif font-medium text-[#17312d] m-0 tracking-tight">
-                Plain-English guides behind every formula.
-              </h2>
-            </div>
-            <a
-              href="/guides"
-              onClick={(e) => navigate("/guides", e)}
-              className="inline-flex items-center gap-1.5 text-sm font-bold text-[#2e7450] hover:text-[#17312d] no-underline shrink-0"
-            >
-              <span>View all {GUIDE_ARTICLES.length} guides</span>
-              <ArrowRight className="w-4 h-4" />
-            </a>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {GUIDE_ARTICLES.slice(0, 6).map((article) => (
-              <article
-                key={article.slug}
-                className="bg-[#fffdf8] border border-[rgba(23,49,45,0.14)] rounded-2xl p-6 flex flex-col justify-between hover:border-[#2e7450] transition-all shadow-sm"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 text-[11px] text-[#60746d] mb-3">
-                    <span className="px-2.5 py-0.5 rounded-full bg-[#e7f2e9] text-[#2e7450] font-bold uppercase tracking-wider">
-                      {article.badge}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {article.readTime}
-                    </span>
-                  </div>
-                  <h3 className="text-lg font-serif font-bold text-[#17312d] leading-snug m-0 mb-2.5">
-                    <a
-                      href={`/guides/${article.slug}`}
-                      onClick={(e) => navigate(`/guides/${article.slug}`, e)}
-                      className="text-inherit hover:text-[#2e7450] no-underline"
-                    >
-                      {article.title}
-                    </a>
-                  </h3>
-                  <p className="text-xs text-[#556862] leading-relaxed line-clamp-3 m-0 mb-4">
-                    {article.summary}
-                  </p>
-                </div>
-                <a
-                  href={`/guides/${article.slug}`}
-                  onClick={(e) => navigate(`/guides/${article.slug}`, e)}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#2e7450] hover:text-[#17312d] no-underline pt-3 border-t border-[rgba(23,49,45,0.08)]"
-                >
-                  <span>Read full guide</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </a>
-              </article>
-            ))}
-          </div>
-        </section>
-        </>
-        )}
-
-        {/* Footer with Crawlable Anchor Links */}
+        {/* Clean Single-Page Footer with Protective Disclaimer */}
         <footer>
-          <a
-            href="/"
-            onClick={(e) => navigate("/", e)}
-            className="brand"
-            aria-label="NextMoveMath home"
-          >
+          <a href="#top" className="brand whitespace-nowrap" aria-label="NextMoveMath top">
             <span className="brand-mark">N</span>
             <span>NextMoveMath</span>
           </a>
           <div className="footer-center">
             <p>
-              Helpful estimates for planning—not a lending decision or financial advice. Local taxes
-              and closing costs vary by province or state, municipality, property type, and buyer
-              eligibility. Adjust any amount to match your situation and confirm final costs with your
-              lawyer or notary, lender, and local authority.
+              <strong>For illustrative estimation only — not financial, mortgage, tax, or legal advice.</strong>{" "}
+              Every rate, fee, tax, and ratio in this calculator is an editable planning estimate
+              provided &ldquo;as-is&rdquo; without warranty of accuracy or lender approval. Always
+              verify exact figures independently with a licensed mortgage professional, lawyer or
+              notary, and tax advisor before making any real estate or financial decisions.
             </p>
             <div className="footer-links">
-              <a
-                href="/"
-                onClick={(e) => navigate("/", e)}
-                className={`footer-link ${showCalculator ? "highlight font-bold" : ""}`}
+              <button
+                type="button"
+                onClick={() => openLegalModal("terms")}
+                className="footer-link cursor-pointer bg-transparent border-0 p-0"
               >
-                Calculator
-              </a>
-              <span className="dot">·</span>
-              <a
-                href="/guides"
-                onClick={(e) => navigate("/guides", e)}
-                className={`footer-link ${isGuidesRoute ? "highlight font-bold" : ""}`}
+                Terms &amp; Disclaimer
+              </button>
+              <span className="dot" aria-hidden="true">
+                ·
+              </span>
+              <button
+                type="button"
+                onClick={() => openLegalModal("privacy")}
+                className="footer-link cursor-pointer bg-transparent border-0 p-0"
               >
-                Educational Guides
-              </a>
-              <span className="dot">·</span>
-              <a
-                href="/methodology"
-                onClick={(e) => navigate("/methodology", e)}
-                className={`footer-link ${isMethodologyRoute ? "highlight font-bold" : ""}`}
-              >
-                Methodology
-              </a>
-              <span className="dot">·</span>
-              <a
-                href="/about"
-                onClick={(e) => navigate("/about", e)}
-                className={`footer-link ${isAboutRoute ? "highlight font-bold" : ""}`}
-              >
-                About Us
-              </a>
-              <span className="dot">·</span>
-              <a
-                href="/contact"
-                onClick={(e) => navigate("/contact", e)}
-                className={`footer-link ${isContactRoute ? "highlight font-bold" : ""}`}
-              >
-                Contact
-              </a>
-              <span className="dot">·</span>
-              <a
-                href="/privacy-policy"
-                onClick={(e) => navigate("/privacy-policy", e)}
-                className={`footer-link ${isPrivacyRoute ? "highlight font-bold" : "highlight"}`}
-                title="View Privacy Policy and Cookie Notice"
-              >
-                Privacy Policy
-              </a>
-              <span className="dot">·</span>
-              <a
-                href="/terms-of-service"
-                onClick={(e) => navigate("/terms-of-service", e)}
-                className={`footer-link ${isTermsRoute ? "highlight font-bold" : ""}`}
-                title="View Terms of Service"
-              >
-                Terms of Service
-              </a>
-              {/* Developer Download Helper: Visible in AI Studio Dev Preview, automatically hidden on live nextmovemath.com */}
-              {typeof window !== "undefined" && !window.location.hostname.includes("nextmovemath.com") && (
-                <>
-                  <span className="dot">·</span>
-                  <a
-                    href="/nextmovemath-source.zip"
-                    download="nextmovemath-source.zip"
-                    className="footer-link"
-                    style={{ color: "#2e7450", fontWeight: 700 }}
-                    title="Download complete production package (Vercel & GitHub ready)"
-                  >
-                    📦 Download Code (Vercel Ready)
-                  </a>
-                </>
-              )}
+                Privacy Notice
+              </button>
+              {typeof window !== "undefined" &&
+                !window.location.hostname.includes("nextmovemath.com") && (
+                  <>
+                    <span className="dot" aria-hidden="true">
+                      ·
+                    </span>
+                    <a
+                      href="/nextmovemath-source.zip"
+                      download="nextmovemath-source.zip"
+                      className="footer-link font-bold text-[#2e7450]"
+                      title="Download complete production package (Vercel & GitHub ready)"
+                    >
+                      Download Code (Vercel Ready)
+                    </a>
+                  </>
+                )}
             </div>
           </div>
           <button
             type="button"
             onClick={() => setCountry?.(isUS ? "CA" : "US")}
             className="footer-jurisdiction cursor-pointer hover:text-emerald-700 transition-colors"
-            title="Click to toggle country"
+            title="Click to switch country"
           >
-            {isUS ? "Active: 🇺🇸 United States (Switch to 🇨🇦 Canada)" : "Active: 🇨🇦 Canada (Switch to 🇺🇸 United States)"}
+            {isUS
+              ? "Active: 🇺🇸 United States (Switch to 🇨🇦 Canada)"
+              : "Active: 🇨🇦 Canada (Switch to 🇺🇸 United States)"}
           </button>
         </footer>
 
@@ -1870,19 +1531,21 @@ export default function NextMoveMathCalculator({
         <section className="print-only-summary" aria-hidden="true">
           <div className="print-header">
             <div>
-              <h1>NextMoveMath — Financial Planning Summary</h1>
-              <p style={{ margin: "4px 0 0", color: "#4b5563", fontSize: "13px" }}>
-                Target Scenario: {paths.find((p) => p.id === mode)?.label} · Jurisdiction: {isUS ? "United States (USD)" : "Canada (CAD)"}
+              <h1>NextMoveMath — Moving Estimate Summary</h1>
+              <p className="mt-1 text-gray-600 text-[13px]">
+                Scenario: {paths.find((p) => p.id === mode)?.label} · Region:{" "}
+                {isUS ? "United States (USD)" : "Canada (CAD)"}
               </p>
             </div>
-            <div style={{ textAlign: "right", fontSize: "12px", color: "#6b7280" }}>
-              Printed: {new Date().toLocaleDateString(isUS ? "en-US" : "en-CA", { dateStyle: "long" })}
+            <div className="text-right text-xs text-gray-500">
+              Printed:{" "}
+              {new Date().toLocaleDateString(isUS ? "en-US" : "en-CA", { dateStyle: "long" })}
             </div>
           </div>
 
           <div className="print-section">
-            <h2 style={{ fontSize: "16px", marginBottom: "10px", color: "#111827", borderBottom: "1px solid #e5e7eb", paddingBottom: "4px" }}>
-              Key Financial Figures
+            <h2 className="text-base mb-2.5 text-gray-900 border-b border-gray-200 pb-1">
+              Estimated Scenario Figures
             </h2>
             <div className="print-grid">
               {mode !== "sell" && (
@@ -1896,7 +1559,7 @@ export default function NextMoveMathCalculator({
                     <strong>{money.format(figures.downPayment)}</strong>
                   </div>
                   <div className="print-box">
-                    <span>Financed Mortgage Amount</span>
+                    <span>Financed Amount</span>
                     <strong>{money.format(figures.mortgage)}</strong>
                   </div>
                   <div className="print-box">
@@ -1912,15 +1575,15 @@ export default function NextMoveMathCalculator({
                     <strong>{money.format(salePrice)}</strong>
                   </div>
                   <div className="print-box">
-                    <span>Mortgage Payout Balance</span>
+                    <span>Mortgage Balance</span>
                     <strong>{money.format(mortgageOwing)}</strong>
                   </div>
                   <div className="print-box">
-                    <span>Total Selling Costs (Realtor + Legal)</span>
+                    <span>Estimated Selling Costs</span>
                     <strong>{money.format(figures.sellingCosts)}</strong>
                   </div>
                   <div className="print-box">
-                    <span>Net Equity Available</span>
+                    <span>Estimated Net Equity</span>
                     <strong>{money.format(figures.netSale)}</strong>
                   </div>
                 </>
@@ -1928,26 +1591,26 @@ export default function NextMoveMathCalculator({
             </div>
           </div>
 
-          {figures.mortgage > 0 && (
+          {figures.mortgage > 0 && financing === "mortgage" && (
             <div className="print-section">
-              <h2 style={{ fontSize: "16px", marginBottom: "10px", color: "#111827", borderBottom: "1px solid #e5e7eb", paddingBottom: "4px" }}>
-                5-Year Horizon Breakdown ({annualRate.toFixed(2)}% over {amortization} Yrs)
+              <h2 className="text-base mb-2.5 text-gray-900 border-b border-gray-200 pb-1">
+                5-Year Horizon Illustration ({annualRate.toFixed(2)}% over {amortization} Yrs)
               </h2>
               <div className="print-grid">
                 <div className="print-box">
-                  <span>5-Year Principal Paid Off</span>
+                  <span>5-Year Principal Paid</span>
                   <strong>{money.format(figures.fiveYearPrincipalPaid)}</strong>
                 </div>
                 <div className="print-box">
-                  <span>5-Year Total Interest Paid</span>
+                  <span>5-Year Interest Paid</span>
                   <strong>{money.format(figures.fiveYearInterestPaid)}</strong>
                 </div>
                 <div className="print-box">
-                  <span>Mortgage Balance at Year 5</span>
+                  <span>Estimated Balance at Year 5</span>
                   <strong>{money.format(figures.mortgageBalanceFiveYears)}</strong>
                 </div>
                 <div className="print-box">
-                  <span>Total Projected Equity (Down + Principal)</span>
+                  <span>Projected Equity (Down + Principal)</span>
                   <strong>{money.format(figures.fiveYearHomeEquity)}</strong>
                 </div>
               </div>
@@ -1955,10 +1618,19 @@ export default function NextMoveMathCalculator({
           )}
 
           <div className="print-disclaimer">
-            <strong>Planning Disclaimer:</strong> NextMoveMath provides mathematical illustrations for consumer planning. Actual mortgage approval, rates, mortgage insurance, and legal costs must be formally verified with a licensed broker, lender, and attorney.
+            <strong>Disclaimer:</strong> NextMoveMath provides illustrative mathematical estimates
+            only and does not constitute financial, mortgage, tax, or legal advice. Verify all
+            rates, taxes, fees, and qualification requirements with licensed professionals before
+            making any real estate or financial decisions.
           </div>
         </section>
 
+        <ComplianceModal
+          isOpen={legalModalOpen}
+          page={legalModalTab}
+          onClose={() => setLegalModalOpen(false)}
+          onSelectPage={(tab) => setLegalModalTab(tab)}
+        />
       </main>
     </div>
   );
